@@ -1,0 +1,28 @@
+﻿{%- assign __feic_ext = Extension | Upcase -%}
+{%- assign __feic_dot = __feic_ext | Truncate:1,'' -%}
+{%- if __feic_dot == '.' -%}
+	{%- assign __feic_ext = __feic_ext | ReplaceFirst:'.','' -%}
+{%- endif -%}
+{%- if __feic_ext == 'JPG' or __feic_ext == 'JPEG' or __feic_ext == 'PNG' or __feic_ext == 'GIF' -%}
+    fa fa-file-image-o
+{%- elseif __feic_ext == 'MOV' or __feic_ext == 'M4V' -%}
+    fa fa-file-video-o
+{%- elseif __feic_ext == 'AIF' or __feic_ext == 'AIFF' or __feic_ext == 'WAV' or __feic_ext == 'MP3' -%}
+    fa fa-file-audio-o
+{%- elseif __feic_ext == 'PDF' -%}
+    fa fa-file-pdf-o
+{%- elseif __feic_ext == 'DOC' or __feic_ext == 'DOCX' -%}
+    fa fa-file-word-o
+{%- elseif __feic_ext == 'XLS' or __feic_ext == 'XLSX' -%}
+    fa fa-file-excel-o
+{%- elseif __feic_ext == 'PPT' or __feic_ext == 'PPTX' -%}
+    fa fa-file-powerpoint-o
+{%- elseif __feic_ext == 'TXT' -%}
+    fa fa-file-text-o
+{%- elseif __feic_ext == 'ASM' or __feic_ext == 'ASP' or __feic_ext == 'ASPX' or __feic_ext == 'C' or __feic_ext == 'CS' or __feic_ext == 'CPP' or __feic_ext == 'CXX' or __feic_ext == 'H' or __feic_ext == 'HTML' or __feic_ext == 'HXX' or __feic_ext == 'JAVA' or __feic_ext == 'JS' or __feic_ext == 'JSP' or __feic_ext == 'M' or __feic_ext == 'MM' or __feic_ext == 'PHP' or __feic_ext == 'PL' or __feic_ext == 'S' or __feic_ext == 'SH' or __feic_ext == 'SWIFT' -%}
+    fa fa-file-code-o
+{%- elseif __feic_ext == 'ZIP' or __feic_ext == 'RAR' or __feic_ext == 'TAR' or __feic_ext == 'GZ' or __feic_ext == 'BZ2' or __feic_ext == 'TGZ' -%}
+    fa fa-file-archive-o
+{%- else -%}
+    fa fa-file-o
+{%- endif -%}

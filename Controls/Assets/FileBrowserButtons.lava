@@ -1,0 +1,43 @@
+﻿<div class="panel panel-default filebrowser-buttons list-as-blocks">
+    <div class="panel-heading">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="filebrowser-location">
+                    <a href="#" onclick="javascript:return {{ BrowseJavascript }}('/');"><i class="fa fa-home"></i></a>
+                    <span>{{ Path }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-body">
+		    <ul>
+			      {%- if Path != '/' %}
+			      <li>
+                <a href="#" onclick="javascript:return {{ BrowseJavascript }}('..');">
+                    <i class="fa fa-fw fa-level-up"></i>
+					          <h3>Up</h3>
+				        </a>
+			      </li>
+			      {%- endif %}
+
+			      {%- for item in Directories %}
+			      <li>
+                <a href="#" onclick="javascript:return {{ BrowseJavascript }}('{{ item.Name }}');">
+                    <i class="fa fa-fw fa-folder"></i>
+					          <h3>{{ item.Name }}</h3>
+				        </a>
+			      </li>
+			      {%- endfor %}
+
+	          {%- for item in Files %}
+			      <li>
+                <a href="{% assign link = ContentPath | Append:item.Name | Split:'/' %}{% for linkElement in link %}/{{ linkElement | EscapeDataString }}{% endfor %}" target="_blank">
+                    <i class="fa-fw {% include '/Plugins/com_shepherdchurch/Misc/Assets/FileExtensionIconClass.lava' Extension:item.Extension %}"></i>
+					          <h3>{{ item.Name }}</h3>
+                </a>
+            </li>
+			      {%- endfor %}
+        </ul>
+    </div>
+</div>

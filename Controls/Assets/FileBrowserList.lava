@@ -1,0 +1,57 @@
+﻿<div class="panel panel-default filebrowser-list">
+    <div class="panel-heading">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="filebrowser-location">
+                    <a href="#" onclick="javascript:return {{ BrowseJavascript }}('/');"><i class="fa fa-home"></i></a>
+                    <span>{{ Path }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-6 col-xs-12">Name</div>
+            <div class="col-sm-3 hidden-xs">Date</div>
+            <div class="col-sm-3 hidden-xs">Size</div>
+        </div>
+    </div>
+
+    <div class="panel-body">
+        {%- if Path != '/' %}
+        <div class="filebrowser-item filebrowser-item-directory">
+            <div class="row">
+                <div class="col-sm-6 col-xs-12">
+                    <span class="fa fa-fw fa-level-up"></span>
+                    <a href="#" onclick="javascript:return {{ BrowseJavascript }}('..');">Up</a></div>
+                <div class="col-sm-3 hidden-xs"></div>
+                <div class="col-sm-3 hidden-xs"></div>
+            </div>
+        </div>
+        {%- endif %}
+
+        {%- for item in Directories %}
+        <div class="filebrowser-item filebrowser-item-directory">
+            <div class="row">
+                <div class="col-sm-6 col-xs-12">
+                    <span class="fa fa-fw fa-folder"></span>
+                    <a href="#" onclick="javascript:return {{ BrowseJavascript }}('{{ item.Name }}');">{{ item.Name }}</a></div>
+                <div class="col-sm-3 hidden-xs"></div>
+                <div class="col-sm-3 hidden-xs"></div>
+            </div>
+        </div>
+        {%- endfor %}
+
+        {%- for item in Files %}
+        <div class="filebrowser-item filebrowser-item-file">
+            <div class="row">
+                <div class="col-sm-6 col-xs-12">
+                    <span class="fa-fw {% include '/Plugins/com_shepherdchurch/Misc/Assets/FileExtensionIconClass.lava' Extension:item.Extension %}"></span>
+                    <a href="{% assign link = ContentPath | Append:item.Name | Split:'/' %}{% for linkElement in link %}/{{ linkElement | EscapeDataString }}{% endfor %}" target="_blank" class="filebrowser-item-link">{{ item.Name }}</a>
+                    <a href="#" class="pull-right filebrowser-item-download" onclick="return {{ DownloadJavascript }}('{{ item.Name }}');"><span class="fa fa-cloud-download"></span></a>
+                </div>
+                <div class="col-sm-3 hidden-xs">{{ item.LastWriteTime | Date:'MMM d, yyyy hh:mm tt' }}</div>
+                <div class="col-sm-3 hidden-xs">{% assign length = item.Length | Floor %}{% if length > 1000000 %}{{ item.Length | DividedBy:1000000,0 | Format:'#,###,##0' | Append:'MB' }}{% else %}{{ item.Length | DividedBy:1000,0 | Format:'#,###,##0' | Append:'KB' }}{% endif %}</div>
+            </div>
+        </div>
+        {%- endfor %}
+    </div>
+</div>

@@ -1,0 +1,18 @@
+﻿.filebrowser-list .panel-heading, .filebrowser-buttons .panel-heading {
+    font-weight: bold;
+}
+
+.filebrowser-location {
+    font-size: 1.2em;
+}
+
+.filebrowser-list .filebrowser-location {
+    margin-bottom: 10px;
+}
+
+.filebrowser-list .panel-body .row {
+    margin-top: 4px;
+}
+    .filebrowser-list .panel-body .row:hover {
+        background-color: rgba(0, 0, 0, 0.1);
+    }
