@@ -21,10 +21,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
     [LinkedPage( "Cancel Page", "The page to direct the user to if they click the cancel button.", order: 0 )]
     [LinkedPage( "Continue Page", "The page to direct the user to if they select their record.", order: 1 )]
+    [TextField( "Header Text", "The text to use for the header area of the page.", false, "Person Search", order: 2 )]
 //    [LinkedPage( "Register Page", "If set the user will be given the option to register themselves after a failed search.", false )]
-    [BooleanField( "Use Person GUID", "Use the Person GUID rather than the ID number when passing to the Continue Page.", false, order: 2 )]
-    [TextField( "Query String Key", "The key to use when passing the Person ID to the Continue Page.", true, "person", order: 3 )]
-    [CustomDropdownListField( "Search Type", "The type of search to perform.", "Phone,Name", true, "Phone", order: 4 )]
+    [BooleanField( "Use Person GUID", "Use the Person GUID rather than the ID number when passing to the Continue Page.", false, order: 3 )]
+    [TextField( "Query String Key", "The key to use when passing the Person ID to the Continue Page.", true, "person", order: 4 )]
+    [CustomDropdownListField( "Search Type", "The type of search to perform.", "Phone,Name", true, "Phone", order: 5 )]
 
     [IntegerField( "Minimum Length", "The minimum number of digits the user must enter to perform a search.", true, 4, "Phone Search", 0, "MinimumPhoneLength" )]
     [IntegerField( "Maximum Length", "The maximum number of digits the user may enter.", true, 11, "Phone Search", 1, "MaximumPhoneLength" )]
@@ -42,6 +43,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         protected override void OnInit( EventArgs e )
         {
             base.OnInit( e );
+
+            base.BlockUpdated += SelfServeSearch_Kiosk_BlockUpdated;
 
             RockPage.AddScriptLink( "~/Scripts/iscroll.js" );
             RockPage.AddScriptLink( "~/Scripts/Kiosk/kiosk-core.js" );
@@ -94,6 +97,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
 
             pnlPersonSelect.Visible = false;
+            pnlSearch.Visible = true;
         }
 
         private void SearchByName()
@@ -128,6 +132,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             this.PeopleResults = searchResults;
 
             pnlSearchName.Visible = false;
+            pnlSearch.Visible = false;
             pnlPersonSelect.Visible = true;
 
             BuildPersonControls();
@@ -173,6 +178,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             this.PeopleResults = searchResults;
 
             pnlSearchPhone.Visible = false;
+            pnlSearch.Visible = false;
             pnlPersonSelect.Visible = true;
 
             BuildPersonControls();
@@ -246,6 +252,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         protected void lbPersonSelectAdd_Click( object sender, EventArgs e )
         {
             NavigateToLinkedPage( "RegisterPage" );
+        }
+
+        private void SelfServeSearch_Kiosk_BlockUpdated( object sender, EventArgs e )
+        {
+            ShowSearchPanel();
         }
     }
 
