@@ -17,7 +17,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 {
     [DisplayName( "Self Serve Search (Kiosk)" )]
     [Category( "com_shepherdchurch > Misc" )]
-    [Description( "" )]
+    [Description( "Provides a way to, fairly safely, allow people to search for themselves at a kiosk. No personal information is displayed to the user and the user is not logged in. After a match is selected they are redirected to the indicated page with a QueryString parameter specifying which person they selected." )]
 
     [LinkedPage( "Cancel Page", "The page to direct the user to if they click the cancel button.", order: 0 )]
     [LinkedPage( "Continue Page", "The page to direct the user to if they select their record.", order: 1 )]
