@@ -178,6 +178,8 @@
                 <div class="scrollpanel">
                     <div class="scroller">
                         <div class="container">
+                            <Rock:NotificationBox ID="nbNoResults" runat="server" NotificationBoxType="Warning"></Rock:NotificationBox>
+
                             <asp:PlaceHolder ID="phPeople" runat="server"></asp:PlaceHolder>
                         </div>
                     </div>

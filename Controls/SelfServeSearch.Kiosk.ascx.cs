@@ -21,11 +21,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
     [LinkedPage( "Cancel Page", "The page to direct the user to if they click the cancel button.", order: 0 )]
     [LinkedPage( "Continue Page", "The page to direct the user to if they select their record.", order: 1 )]
-    [TextField( "Header Text", "The text to use for the header area of the page.", false, "Person Search", order: 2 )]
-//    [LinkedPage( "Register Page", "If set the user will be given the option to register themselves after a failed search.", false )]
-    [BooleanField( "Use Person GUID", "Use the Person GUID rather than the ID number when passing to the Continue Page.", false, order: 3 )]
-    [TextField( "Query String Key", "The key to use when passing the Person ID to the Continue Page.", true, "person", order: 4 )]
-    [CustomDropdownListField( "Search Type", "The type of search to perform.", "Phone,Name", true, "Phone", order: 5 )]
+    [LinkedPage( "Register Page", "If set the user will be given the option to register themselves after a failed search.", false, order: 2 )]
+    [TextField( "Header Text", "The text to use for the header area of the page.", false, "Person Search", order: 3 )]
+    [BooleanField( "Use Person GUID", "Use the Person GUID rather than the ID number when passing to the Continue Page.", false, order: 4 )]
+    [TextField( "Query String Key", "The key to use when passing the Person ID to the Continue Page.", true, "person", order: 5 )]
+    [TextField( "Include Parameters", "A comma separated list of Page Parameters or Query String Parameters that will be passed on to the Continue or Register page. If left blank then all parameters are passed.", false, "", order: 6 )]
+    [CustomDropdownListField( "Search Type", "The type of search to perform.", "Phone,Name", true, "Phone", order: 7 )]
 
     [IntegerField( "Minimum Length", "The minimum number of digits the user must enter to perform a search.", true, 4, "Phone Search", 0, "MinimumPhoneLength" )]
     [IntegerField( "Maximum Length", "The maximum number of digits the user may enter.", true, 11, "Phone Search", 1, "MaximumPhoneLength" )]
@@ -34,12 +35,25 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     [IntegerField( "Minimum Length", "The minimum number of letters the user must enter to perform a search.", true, 3, "Name Search", 0, "MinimumNameLength" )]
     public partial class SelfServeSearch_Kiosk : RockBlock
     {
+        #region Properties and Fields
+
+        /// <summary>
+        /// List of PersonDto objects that identify the currently displayed result set.
+        /// </summary>
         private List<PersonDto> PeopleResults
         {
             get { return ( List<PersonDto> )ViewState["PeopleResults"]; }
             set { ViewState["PeopleResults"] = value; }
         }
 
+        #endregion
+
+        #region Base Method Overrides
+
+        /// <summary>
+        /// Raises the <see cref="E:System.Web.UI.Control.Init" /> event.
+        /// </summary>
+        /// <param name="e">An <see cref="T:System.EventArgs" /> object that contains the event data.</param>
         protected override void OnInit( EventArgs e )
         {
             base.OnInit( e );
@@ -50,9 +64,15 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             RockPage.AddScriptLink( "~/Scripts/Kiosk/kiosk-core.js" );
         }
 
+        /// <summary>
+        /// Initialize basic information about the page structure and setup the default content.
+        /// </summary>
+        /// <param name="sender">Object that is generating this event.</param>
+        /// <param name="e">Arguments that describe this event.</param>
         protected override void OnLoad( EventArgs e )
         {
             base.OnLoad( e );
+
             if ( !Page.IsPostBack )
             {
                 ShowSearchPanel();
@@ -66,19 +86,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
         }
 
-        protected void lbSearch_Click( object sender, EventArgs e )
-        {
-            if ( pnlSearchName.Visible )
-            {
-                SearchByName();
-            }
-            else
-            {
-                SearchByPhone();
-            }
-        }
+        #endregion
 
-        void ShowSearchPanel()
+        #region Core Methods
+
+        /// <summary>
+        /// Show the search panel and clear initial values.
+        /// </summary>
+        private void ShowSearchPanel()
         {
             tbPhone.Text = string.Empty;
             tbName.Text = string.Empty;
@@ -100,23 +115,17 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             pnlSearch.Visible = true;
         }
 
-        private void SearchByName()
+        /// <summary>
+        /// Build the PersonDto object list from the results in the IQueryable.
+        /// </summary>
+        /// <param name="people">The IQueryable that contains the database results.</param>
+        protected void BuildResultData( IQueryable<Person> people )
         {
             var searchResults = new List<PersonDto>();
 
-            RockContext rockContext = new RockContext();
-            PersonService personService = new PersonService( rockContext );
-            string name = tbName.Text;
-            bool reversed;
-
-            if ( name.Length < GetAttributeValue( "MinimumNameLength" ).AsInteger() )
-            {
-                nbNameSearch.Text = string.Format( "You must enter at least {0} letters", GetAttributeValue( "MinimumNameLength" ).AsInteger() );
-                return;
-            }
-
-            var people = personService.GetByFullName( name, false, true, false, out reversed );
-
+            //
+            // Build the list of Data Table Objects that will identify each matched person.
+            //
             foreach ( var person in people.ToList() )
             {
                 if ( GetAttributeValue( "UsePersonGUID" ).AsBoolean() )
@@ -129,8 +138,39 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 }
             }
 
+            //
+            // Store our results so they go into the ViewState.
+            //
             this.PeopleResults = searchResults;
+        }
 
+        /// <summary>
+        /// Search for people by name.
+        /// </summary>
+        private void SearchByName()
+        {
+            RockContext rockContext = new RockContext();
+            PersonService personService = new PersonService( rockContext );
+            string name = tbName.Text;
+            bool reversed;
+
+            //
+            // Verify they entered the minimum number of characters.
+            //
+            if ( name.Length < GetAttributeValue( "MinimumNameLength" ).AsInteger() )
+            {
+                nbNameSearch.Text = string.Format( "You must enter at least {0} letters", GetAttributeValue( "MinimumNameLength" ).AsInteger() );
+                return;
+            }
+
+            //
+            // Perform the search.
+            //
+            BuildResultData( personService.GetByFullName( name, false, true, false, out reversed ) );
+
+            //
+            // Toggle panel visibility and show the results.
+            //
             pnlSearchName.Visible = false;
             pnlSearch.Visible = false;
             pnlPersonSelect.Visible = true;
@@ -138,22 +178,32 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             BuildPersonControls();
         }
 
+        /// <summary>
+        /// Perform a search on phone number.
+        /// </summary>
         private void SearchByPhone()
         {
-            var searchResults = new List<PersonDto>();
-
             RockContext rockContext = new RockContext();
             PersonService personService = new PersonService( rockContext );
             string phoneNumber = tbPhone.Text;
 
+            //
+            // Verify that they entered enough digits.
+            //
             if ( phoneNumber.Length < GetAttributeValue( "MinimumPhoneLength" ).AsInteger() )
             {
                 nbPhoneSearch.Text = string.Format( "You must enter at least {0} digits", GetAttributeValue( "MinimumPhoneLength" ).AsInteger() );
                 return;
             }
 
+            //
+            // Get the initial person search. This is basically a Contains search.
+            //
             var people = personService.GetByPhonePartial( phoneNumber, false, true );
 
+            //
+            // If they want to filter on Starts With or Ends With then constrain it even more.
+            //
             if ( GetAttributeValue( "PhoneSearchStyle" ) == "Starts With" )
             {
                 people = people.Where( p => p.PhoneNumbers.Where( pn => pn.Number.StartsWith( phoneNumber ) ).Any() );
@@ -163,20 +213,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 people = people.Where( p => p.PhoneNumbers.Where( pn => pn.Number.EndsWith( phoneNumber ) ).Any() );
             }
 
-            foreach ( var person in people.ToList() )
-            {
-                if ( GetAttributeValue( "UsePersonGUID" ).AsBoolean() )
-                {
-                    searchResults.Add( new PersonDto( person.Guid.ToString(), person.LastName, person.NickName ) );
-                }
-                else
-                {
-                    searchResults.Add( new PersonDto( person.Id.ToString(), person.LastName, person.NickName ) );
-                }
-            }
+            BuildResultData( people );
 
-            this.PeopleResults = searchResults;
-
+            //
+            // Toggle panel visibility and show the results.
+            //
             pnlSearchPhone.Visible = false;
             pnlSearch.Visible = false;
             pnlPersonSelect.Visible = true;
@@ -184,11 +225,123 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             BuildPersonControls();
         }
 
+        /// <summary>
+        /// Build the person select controls based on the current matched list of people.
+        /// </summary>
+        private void BuildPersonControls()
+        {
+            lbPersonSelectAdd.Visible = !string.IsNullOrWhiteSpace( PageParameter( "RegisterPage" ) );
+
+            //
+            // If we have any results then build the link buttons for the user to click.
+            //
+            if ( this.PeopleResults.Count > 0 )
+            {
+                foreach ( var unit in this.PeopleResults )
+                {
+                    LinkButton lb = new LinkButton();
+
+                    lb.ID = "lbUnit_" + unit.PersonId.ToString();
+                    lb.CssClass = "btn btn-primary btn-kioskselect";
+                    lb.Text = string.Format( "{0}, <small>{1}</small>", unit.LastName, unit.FirstName );
+                    lb.CommandArgument = unit.CommandArg;
+                    lb.Click += new EventHandler( personName_Click );
+
+                    phPeople.Controls.Add( lb );
+                }
+
+                nbNoResults.Text = string.Empty;
+            }
+            else
+            {
+                //
+                // There were no matched people. Display an error message telling them their options.
+                //
+                if ( !string.IsNullOrEmpty( GetAttributeValue( "RegisterPage" ) ) )
+                {
+                    nbNoResults.Text = "There were not any families found with the phone number you entered. You can add yourself using the 'Register' button below.";
+                    lbPersonSelectAdd.Visible = true;
+                }
+                else
+                {
+                    nbNoResults.Text = "There were not any families found with the phone number you entered.";
+                }
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the standard navigation parameters that will be passed to linked pages.
+        /// </summary>
+        /// <returns>Dictionary of strings which identifies the navigation parameters</returns>
+        Dictionary<string, string> GetNavigationParameters()
+        {
+            var parameters = PageParameters();
+
+            //
+            // If they have not defined any included parameters, include everything except
+            // the PageId as that is a standard parameter in all requests.
+            //
+            if ( string.IsNullOrWhiteSpace( PageParameter( "IncludeParameters" ) ) )
+            {
+                return parameters
+                    .Keys
+                    .Where( k => k != "PageId" )
+                    .ToDictionary( k => k, k => parameters[k].ToString() );
+            }
+
+            //
+            // Otherwise make a list of the parameters they want to include.
+            //
+            List<string> include = PageParameter( "IncludeParameters" )
+                .Split( ',' )
+                .Select( s => s.Trim() )
+                .ToList();
+
+            //
+            // And generate navigation parameters based on that.
+            //
+            return parameters
+                .Keys
+                .Where( k => include.Contains( k ) )
+                .ToDictionary( k => k, k => parameters[k].ToString() );
+        }
+
+        #endregion
+
+        #region Event Handlers
+
+        /// <summary>
+        /// Handles the Click event of the lbSearch control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void lbSearch_Click( object sender, EventArgs e )
+        {
+            if ( pnlSearchName.Visible )
+            {
+                SearchByName();
+            }
+            else
+            {
+                SearchByPhone();
+            }
+        }
+
+        /// <summary>
+        /// Handles the Click event of the lbBack control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void lbBack_Click( object sender, EventArgs e )
         {
             ShowSearchPanel();
         }
 
+        /// <summary>
+        /// Handles the Click event of the lbCancel control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void lbCancel_Click( object sender, EventArgs e )
         {
             if ( !string.IsNullOrEmpty( PageParameter( "return" ) ) )
@@ -202,90 +355,103 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
         }
 
-        void personName_Click( object sender, EventArgs e )
+        /// <summary>
+        /// Handles the Click event of the dynamic person select controls.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void personName_Click( object sender, EventArgs e )
         {
             LinkButton lb = ( LinkButton )sender;
             PersonDto dto = new PersonDto( lb.CommandArgument );
-            Dictionary<string, string> queryParams = Request.QueryString.AllKeys.ToDictionary( p => p, p => Request.QueryString[p] );
+            Dictionary<string, string> queryParams = GetNavigationParameters();
 
             queryParams.AddOrReplace( GetAttributeValue( "QueryStringKey" ), dto.PersonId );
 
             NavigateToLinkedPage( "ContinuePage", queryParams );
         }
 
-        private void BuildPersonControls()
-        {
-            lbPersonSelectAdd.Visible = false;
-
-            // display results
-            if ( this.PeopleResults.Count > 0 )
-            {
-                foreach ( var unit in this.PeopleResults )
-                {
-                    LinkButton lb = new LinkButton();
-                    lb.ID = "lbUnit_" + unit.PersonId.ToString();
-                    lb.CssClass = "btn btn-primary btn-kioskselect";
-                    phPeople.Controls.Add( lb );
-                    lb.CommandArgument = unit.CommandArg;
-                    lb.Click += new EventHandler( personName_Click );
-                    lb.Text = string.Format( "{0}, <small>{1}</small>", unit.LastName, unit.FirstName );
-                }
-            }
-            else
-            {
-                string message;
-
-                if ( !string.IsNullOrEmpty( GetAttributeValue( "RegisterPage" ) ) )
-                {
-                    message = "There were not any families found with the phone number you entered. You can add yourself using the 'Register' button below.";
-                    lbPersonSelectAdd.Visible = true;
-                }
-                else
-                {
-                    message = "There were not any families found with the phone number you entered.";
-                }
-
-                phPeople.Controls.Add( new LiteralControl( string.Format( "<div class='alert alert-info'>{0}</div>", message ) ) );
-            }
-        }
-
+        /// <summary>
+        /// Handles the Click event of the lbPersonSelectAdd control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void lbPersonSelectAdd_Click( object sender, EventArgs e )
         {
-            NavigateToLinkedPage( "RegisterPage" );
+            NavigateToLinkedPage( "RegisterPage", GetNavigationParameters() );
         }
 
-        private void SelfServeSearch_Kiosk_BlockUpdated( object sender, EventArgs e )
+        /// <summary>
+        /// Handles the BlockUpdated event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void SelfServeSearch_Kiosk_BlockUpdated( object sender, EventArgs e )
         {
             ShowSearchPanel();
         }
-    }
 
-    [Serializable]
-    class PersonDto
-    {
-        public string PersonId { get; set; }
-        public string LastName { get; set; }
-        public string FirstName { get; set; }
+        #endregion
 
-        public string CommandArg
+        #region Child Classes
+
+        /// <summary>
+        /// Defines a Person object in a simplified manner that can be stored in the
+        /// ViewState.
+        /// </summary>
+        [Serializable]
+        protected class PersonDto
         {
-            get { return string.Format( "{0}|{1}|{2}", PersonId, LastName, FirstName ); }
+            /// <summary>
+            /// The Identifier of this Person.
+            /// </summary>
+            public string PersonId { get; set; }
+
+            /// <summary>
+            /// The Last Name of this Person.
+            /// </summary>
+            public string LastName { get; set; }
+
+            /// <summary>
+            /// The First Name of this Person.
+            /// </summary>
+            public string FirstName { get; set; }
+
+            /// <summary>
+            /// Command Argument used to identify this Person in postback events.
+            /// </summary>
+            public string CommandArg
+            {
+                get { return string.Format( "{0}|{1}|{2}", PersonId, LastName, FirstName ); }
+            }
+
+            /// <summary>
+            /// Constructs a new PersonDto object based on the supplied parameters.
+            /// </summary>
+            /// <param name="personId">The Identifier to use for this Person.</param>
+            /// <param name="lastName">The Last Name to use for this Person.</param>
+            /// <param name="firstNames">The First Name to use for this Person.</param>
+            public PersonDto( string personId, string lastName, string firstNames )
+            {
+                PersonId = personId;
+                LastName = lastName;
+                FirstName = firstNames;
+            }
+
+            /// <summary>
+            /// Construct a new PersonDto object based on the command argument.
+            /// </summary>
+            /// <param name="commandArg">Command argument that was used during postback.</param>
+            public PersonDto( string commandArg )
+            {
+                string[] parts = commandArg.Split( '|' );
+
+                PersonId = parts[0];
+                LastName = parts[1];
+                FirstName = parts[2];
+            }
         }
 
-        public PersonDto( string personId, string lastName, string firstNames )
-        {
-            PersonId = personId;
-            LastName = lastName;
-            FirstName = firstNames;
-        }
-
-        public PersonDto( string commandArg )
-        {
-            string[] parts = commandArg.Split( '|' );
-
-            PersonId = parts[0];
-            LastName = parts[1];
-            FirstName = parts[2];
-        }
+        #endregion
     }
 }
