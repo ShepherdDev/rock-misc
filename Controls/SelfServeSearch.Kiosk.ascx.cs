@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
@@ -26,7 +27,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     [BooleanField( "Use Person GUID", "Use the Person GUID rather than the ID number when passing to the Continue Page.", false, order: 4 )]
     [TextField( "Query String Key", "The key to use when passing the Person ID to the Continue Page.", true, "person", order: 5 )]
     [TextField( "Include Parameters", "A comma separated list of Page Parameters or Query String Parameters that will be passed on to the Continue or Register page. If left blank then all parameters are passed.", false, "", order: 6 )]
-    [CustomDropdownListField( "Search Type", "The type of search to perform.", "Phone,Name", true, "Phone", order: 7 )]
+    [CustomDropdownListField( "Search Type", "The type of search to perform.", "Phone,Name,Both", true, "Phone", order: 7 )]
+    [DataViewField( "Filter Results", "Filter the results to only those people that are present in this data view.", false, entityTypeName: "Rock.Model.Person", order: 8 )]
 
     [IntegerField( "Minimum Length", "The minimum number of digits the user must enter to perform a search.", true, 4, "Phone Search", 0, "MinimumPhoneLength" )]
     [IntegerField( "Maximum Length", "The maximum number of digits the user may enter.", true, 11, "Phone Search", 1, "MaximumPhoneLength" )]
@@ -106,6 +108,15 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
             else
             {
+                if ( GetAttributeValue( "SearchType" ) == "Both" )
+                {
+                    tbPhone.Label = "Phone Number or Name";
+                }
+                else
+                {
+                    tbPhone.Label = "Phone Number";
+                }
+
                 pnlSearchPhone.Visible = true;
                 pnlSearchName.Visible = false;
                 Page.Form.DefaultButton = lbPhoneSearch.UniqueID;
@@ -126,7 +137,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             //
             // Build the list of Data Table Objects that will identify each matched person.
             //
-            foreach ( var person in people.ToList() )
+            foreach ( var person in people )
             {
                 if ( GetAttributeValue( "UsePersonGUID" ).AsBoolean() )
                 {
@@ -147,11 +158,10 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <summary>
         /// Search for people by name.
         /// </summary>
-        private void SearchByName()
+        private void SearchByName( string name )
         {
             RockContext rockContext = new RockContext();
             PersonService personService = new PersonService( rockContext );
-            string name = tbName.Text;
             bool reversed;
 
             //
@@ -166,7 +176,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             //
             // Perform the search.
             //
-            BuildResultData( personService.GetByFullName( name, false, true, false, out reversed ) );
+            var people = personService.GetByFullName( name, false, true, false, out reversed );
+            people = ApplyCommonQueryFilters( people, rockContext );
+            BuildResultData( people );
 
             //
             // Toggle panel visibility and show the results.
@@ -181,11 +193,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <summary>
         /// Perform a search on phone number.
         /// </summary>
-        private void SearchByPhone()
+        private void SearchByPhone( string phoneNumber )
         {
             RockContext rockContext = new RockContext();
             PersonService personService = new PersonService( rockContext );
-            string phoneNumber = tbPhone.Text;
+
+            nbPhoneSearch.Text = string.Empty;
 
             //
             // Verify that they entered enough digits.
@@ -193,6 +206,15 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             if ( phoneNumber.Length < GetAttributeValue( "MinimumPhoneLength" ).AsInteger() )
             {
                 nbPhoneSearch.Text = string.Format( "You must enter at least {0} digits", GetAttributeValue( "MinimumPhoneLength" ).AsInteger() );
+                return;
+            }
+
+            //
+            // Verify that they entered only digits.
+            //
+            if ( !phoneNumber.All( char.IsDigit ) )
+            {
+                nbPhoneSearch.Text = string.Format( "You can only search by numbers only." );
                 return;
             }
 
@@ -213,6 +235,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 people = people.Where( p => p.PhoneNumbers.Where( pn => pn.Number.EndsWith( phoneNumber ) ).Any() );
             }
 
+            people = ApplyCommonQueryFilters( people, rockContext );
             BuildResultData( people );
 
             //
@@ -223,6 +246,37 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             pnlPersonSelect.Visible = true;
 
             BuildPersonControls();
+        }
+
+        /// <summary>
+        /// Apply a set of common query filters to the query of people objects.
+        /// </summary>
+        /// <param name="people">The base query object.</param>
+        /// <param name="rockContext">The context the base query object was constructed in.</param>
+        private IQueryable<Person> ApplyCommonQueryFilters( IQueryable<Person> people, RockContext rockContext )
+        {
+            //
+            // Filter the results by the dataview selected.
+            //
+            if ( !string.IsNullOrEmpty( GetAttributeValue( "FilterResults" ) ) )
+            {
+                var personService = new PersonService( rockContext );
+                DataView filterSource = new DataViewService( rockContext ).Get( GetAttributeValue( "FilterResults" ).AsGuid() );
+                List<string> errorMessages = new List<string>();
+                var parameterExpression = personService.ParameterExpression;
+
+                var whereExpression = filterSource.GetExpression( personService, parameterExpression, out errorMessages );
+                var sourceItems = personService.Get( parameterExpression, whereExpression ).Select( q => q.Id );
+
+                people = people.Where( p => sourceItems.Contains( p.Id ) );
+            }
+
+            //
+            // Order and limit the results.
+            //
+            people = people.OrderBy( p => p.LastName ).ThenBy( p => p.FirstName ).Take( 100 );
+
+            return people;
         }
 
         /// <summary>
@@ -319,11 +373,18 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             if ( pnlSearchName.Visible )
             {
-                SearchByName();
+                SearchByName( tbName.Text.Trim() );
             }
             else
             {
-                SearchByPhone();
+                if ( GetAttributeValue( "SearchType" ) == "Phone" || tbPhone.Text.Trim().All( char.IsDigit ) )
+                {
+                    SearchByPhone( tbPhone.Text.Trim() );
+                }
+                else
+                {
+                    SearchByName( tbPhone.Text.Trim() );
+                }
             }
         }
 
