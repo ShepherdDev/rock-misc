@@ -313,12 +313,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 //
                 if ( !string.IsNullOrEmpty( GetAttributeValue( "RegisterPage" ) ) )
                 {
-                    nbNoResults.Text = "There were not any families found with the phone number you entered. You can add yourself using the 'Register' button below.";
+                    nbNoResults.Text = "There were not any available people found with the search term you entered. You can add yourself using the 'Register' button below.";
                     lbPersonSelectAdd.Visible = true;
                 }
                 else
                 {
-                    nbNoResults.Text = "There were not any families found with the phone number you entered.";
+                    nbNoResults.Text = "There were not any available people found with the search term you entered.";
                 }
             }
         }
