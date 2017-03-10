@@ -22,8 +22,9 @@ using System.Linq.Expressions;
 
 using Rock.Data;
 using Rock.Model;
+using Rock.Reporting;
 
-namespace Rock.Reporting.DataSelect.Group
+namespace com_shepherdchurch.Misc.DataSelect
 {
     /// <summary>
     /// 
