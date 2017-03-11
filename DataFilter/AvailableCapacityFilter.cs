@@ -58,7 +58,7 @@ namespace com_shepherdchurch.Misc.DataFilter
         /// </value>
         public override string Section
         {
-            get { return "Additional Filters"; }
+            get { return "com_shepherdchurch"; }// return "Additional Filters"; }
         }
 
         #endregion
