@@ -200,6 +200,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             nbPhoneSearch.Text = string.Empty;
 
+            if ( phoneNumber[0] == '1' )
+            {
+                phoneNumber = phoneNumber.Substring( 1 );
+            }
+
             //
             // Verify that they entered enough digits.
             //
