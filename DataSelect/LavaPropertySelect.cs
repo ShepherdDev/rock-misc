@@ -17,8 +17,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.ComponentModel.Composition;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity.Core.Metadata.Edm;
 using System.Data.Entity.Infrastructure;
@@ -27,6 +25,7 @@ using System.Linq.Expressions;
 using System.Runtime.Serialization;
 using System.Web.UI.WebControls;
 
+using Rock;
 using Rock.Data;
 using Rock.Reporting;
 using Rock.Web.UI.Controls;
@@ -35,15 +34,13 @@ using Newtonsoft.Json;
 namespace com_shepherdchurch.Misc.DataSelect
 {
     /// <summary>
-    /// Select a property of the entity and process through Lava.
+    /// Generic implementation of a Lava Property DataSelect component that
+    /// uses the TargetEntityType to give the user a drop down list of all
+    /// available properties to report on. The value is parsed through a
+    /// Lava
     /// </summary>
-    [Description( "Select a property of the Group and process through Lava" )]
-    [Export( typeof( DataSelectComponent ) )]
-    [ExportMetadata( "ComponentName", "Group Lava Property" )]
-    public class GroupLavaPropertySelect : LavaPropertySelect<Rock.Model.Group>
-    {
-    }
-    public abstract class LavaPropertySelect<TargetEntityType> : DataSelectComponent
+    /// <typeparam name="TargetEntityType"></typeparam>
+    public abstract class LavaPropertySelect<TargetEntityType> : DataSelectComponent where TargetEntityType : IEntity
     {
         #region Properties
 
@@ -206,16 +203,13 @@ namespace com_shepherdchurch.Misc.DataSelect
         /// <returns></returns>
         public override System.Web.UI.Control[] CreateChildControls( System.Web.UI.Control parentControl )
         {
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
-            var propertyKey = string.Format( "{0}_{1}_Property", GetType().FullName, parentControl.ID );
-            var sortKey = string.Format( "{0}_{1}_Sort", GetType().FullName, parentControl.ID );
-            var propertyValue = ( string ) cache.Get( propertyKey );
-            var sortValue = ( string ) cache.Get( sortKey );
-
             var ddlProperty = new RockDropDownList();
             ddlProperty.HelpBlock.Text = "Select the property you wish to include in the report";
             ddlProperty.ID = parentControl.ID + "_0";
             ddlProperty.Label = "Property";
+            ddlProperty.SelectedIndexChanged += ddlProperty_SelectedIndexChanged;
+            ddlProperty.AutoPostBack = true;
+            parentControl.Controls.Add( ddlProperty );
 
             /* Get all the DataMember properties that are not hidden in reporting. */
             var properties = typeof( TargetEntityType )
@@ -235,87 +229,62 @@ namespace com_shepherdchurch.Misc.DataSelect
                 }
             }
 
+            /* Add each of the available properties to the drop down list. */
             ddlProperty.Items.Add( new ListItem() );
             foreach ( var prop in properties.OrderBy( n => n ) )
             {
                 ddlProperty.Items.Add( prop );
             }
 
-            ddlProperty.SelectedIndexChanged += ddlProperty_SelectedIndexChanged;
-            ddlProperty.AutoPostBack = true;
-//            if ( propertyValue != null )
-//            {
-//                ddlProperty.SelectedValue = propertyValue;
-//            }
+            /* Direct access the postback variables to set the currently selected property value. */
+            string selectedPropertyValue = parentControl.Page.Request.Params[ddlProperty.UniqueID];
+            ddlProperty.SelectedValue = selectedPropertyValue;
 
-            parentControl.Controls.Add( ddlProperty );
-
+            /* Create the sort property drop down. */
             var ddlSortProperty = new RockDropDownList();
-            ddlSortProperty.HelpBlock.Text = "Select the child property you wish to sort by.";
+            ddlSortProperty.HelpBlock.Text = "The selected property is a linked entity and cannot be sorted on directly. Select the sub-property you wish to sort by.";
             ddlSortProperty.ID = parentControl.ID + "_1";
-            ddlSortProperty.Label = "Property";
-            if ( propertyValue != null )
-            {
-                PopulateSortProperties( propertyValue, ddlSortProperty );
-            }
-            //            if ( sortValue != null )
-            //            {
-            //                ddlSortProperty.SelectedValue = sortValue;
-            //            }
-//            ddlSortProperty.SelectedIndexChanged += ddlSortProperty_SelectedIndexChanged;
-//            ddlSortProperty.AutoPostBack = true;
+            ddlSortProperty.Label = "Sort-by Property";
             parentControl.Controls.Add( ddlSortProperty );
+            PopulateSortProperties( ddlProperty.SelectedValue, ddlSortProperty );
 
+            /* Create the code editor they use to provide Lava formatting syntax. */
             CodeEditor codeEditor = new CodeEditor();
             codeEditor.HelpBlock.Text = "Use Lava syntax to get format the value of the selected property. The lava variable uses the same name as the property name. Common merge fields such as CurrentPerson are also available.";
             codeEditor.EditorMode = CodeEditorMode.Lava;
             codeEditor.ID = parentControl.ID + "_2";
             codeEditor.Label = "Template";
-
             parentControl.Controls.Add( codeEditor );
 
-            return new System.Web.UI.Control[] { ddlProperty, codeEditor };
+            return new System.Web.UI.Control[] { ddlProperty, ddlSortProperty, codeEditor };
         }
 
         /// <summary>
-        /// Save the value to cache so we can get it back during postback.
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void ddlSortProperty_SelectedIndexChanged( object sender, EventArgs e )
-        {
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
-            var ddlSortProperty = ( RockDropDownList ) sender;
-            var key = string.Format( "{0}_{1}_Sort", GetType().FullName, ddlSortProperty.Parent.ID );
-
-            cache.AddOrGetExisting( key, ddlSortProperty.SelectedValue, new DateTimeOffset( DateTime.Now.AddHours( 1 ) ) );
-        }
-
-        /// <summary>
-        /// Save the selected value to cache so we can get it back during postback and then
-        /// populate the sort property list.
+        /// Populate the list of available sort sub-properties when the user changes the
+        /// selected property index.
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void ddlProperty_SelectedIndexChanged( object sender, EventArgs e )
         {
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
             var ddlProperty = ( RockDropDownList ) sender;
             var ddlSortProperty = ( RockDropDownList ) ddlProperty.Parent.Controls[1];
-            var key = string.Format( "{0}_{1}_Property", GetType().FullName, ddlProperty.Parent.ID );
-
-            cache.AddOrGetExisting( key, ddlProperty.SelectedValue, new DateTimeOffset( DateTime.Now.AddHours( 1 ) ) );
 
             PopulateSortProperties( ddlProperty.SelectedValue, ddlSortProperty );
         }
 
+        /// <summary>
+        /// Populate the list of properties under the selected property that can
+        /// be used for sorting.
+        /// </summary>
+        /// <param name="propertyName">The name of the selected property.</param>
+        /// <param name="ddlSortProperty">RockDropDownList to populate.</param>
         protected void PopulateSortProperties( string propertyName, RockDropDownList ddlSortProperty )
         {
             var oldSelection = ddlSortProperty.SelectedValue;
 
             ddlSortProperty.Items.Clear();
             ddlSortProperty.Items.Add( new ListItem() );
-            ddlSortProperty.Visible = false;
 
             if ( !string.IsNullOrWhiteSpace( propertyName ) )
             {
@@ -329,14 +298,13 @@ namespace com_shepherdchurch.Misc.DataSelect
                         .Where( p => !Attribute.IsDefined( p, typeof( NotMappedAttribute ) ) )
                         .Where( p => !Attribute.IsDefined( p, typeof( HideFromReportingAttribute ) ) )
                         .Where( p => !typeof( IEnumerable ).IsAssignableFrom( p.PropertyType ) )
+                        .Where( p => !typeof( IEntity ).IsAssignableFrom( p.PropertyType ) )
                         .Select( p => p.Name );
 
                     foreach ( var prop in properties )
                     {
                         ddlSortProperty.Items.Add( prop );
                     }
-
-                    ddlSortProperty.Visible = true;
                 }
             }
 
@@ -344,6 +312,8 @@ namespace com_shepherdchurch.Misc.DataSelect
             {
                 ddlSortProperty.SelectedValue = oldSelection;
             }
+
+            ddlSortProperty.Visible = ddlSortProperty.Items.Count > 1;
         }
 
         /// <summary>
@@ -405,7 +375,7 @@ namespace com_shepherdchurch.Misc.DataSelect
                     codeEditor.Text = data.Template ?? string.Empty;
                     ddlProperty.SelectedValue = data.Property ?? string.Empty;
 
-                    ddlProperty_SelectedIndexChanged( ddlProperty, new EventArgs() );
+                    PopulateSortProperties( ddlProperty.SelectedValue, ddlSortProperty );
                     ddlSortProperty.SelectedValue = data.SortProperty;
                 }
             }

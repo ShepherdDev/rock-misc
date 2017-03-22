@@ -70,7 +70,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DataFilter\AvailableCapacityFilter.cs" />
+    <Compile Include="DataSelect\GroupLavaPropertySelect.cs" />
     <Compile Include="DataSelect\LavaPropertySelect.cs" />
+    <Compile Include="DataSelect\PersonLavaPropertySelect.cs" />
+    <Compile Include="DataSelect\ScheduleSelect.cs" />
     <Compile Include="Grid\LavaBoundField.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
