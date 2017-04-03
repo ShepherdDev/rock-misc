@@ -75,6 +75,39 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
         #endregion
 
+        protected void btnPreview_Click( object sender, EventArgs e )
+        {
+            RockContext rockContext = new RockContext();
+            var workflowTypeService = new WorkflowTypeService( rockContext );
+            var workflowType = workflowTypeService.Get( wtpExport.SelectedValueAsId().Value );
+
+            var tree = Helper.GenerateTree( workflowType );
+
+            Action<StringBuilder, EntityReferenceTree, string> buildTree = null;
+            buildTree = ( sb, parent, indent ) => {
+                if ( indent == string.Empty )
+                {
+                    sb.AppendLine( string.Format( "{0} {1}", Helper.GetEntityType( parent.Entity ).FullName, parent.Entity.Guid ) );
+                }
+
+                if ( parent.Children.Any() )
+                {
+                    var last = parent.Children.Last();
+                    foreach ( var c in parent.Children )
+                    {
+                        sb.Append( indent + ( c == last ? " \\- " : " |- " ) );
+                        sb.AppendLine( string.Format( "{0}: {1} {2}", c.PropertyName, Helper.GetEntityType( c.Entity ).FullName, c.Entity.Guid ) );
+
+                        buildTree( sb, c, indent + ( c == last ? "    " : " |  " ) );
+                    }
+                }
+            };
+
+            StringBuilder content = new StringBuilder();
+            buildTree( content, tree, string.Empty );
+            ltDebug.Text = content.ToString();
+        }
+
         protected void btnExport_Click( object sender, EventArgs e )
         {
             RockContext rockContext = new RockContext();
@@ -327,6 +360,35 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         #endregion
 
         #region Static Methods
+
+        /// <summary>
+        /// Generate  atree of all entities that can be exported from the parent entity.
+        /// This can be used to present to the user and ask them if there are any entities
+        /// they do not wish to export.
+        /// </summary>
+        /// <param name="parent">The root entity that is going to be exported.</param>
+        /// <returns>An object that represents the entity tree.</returns>
+        static public EntityReferenceTree GenerateTree( IEntity parent )
+        {
+            Helper helper = new Helper( new RockContext() );
+
+            EntityReferenceTree root = new EntityReferenceTree();
+            root.Entity = parent;
+            root.PropertyName = string.Empty;
+
+            helper.EnqueueEntity( parent, new EntityPath() );
+
+            Dictionary<IEntity, EntityPath> entities = new Dictionary<IEntity, EntityPath>();
+            helper.Entities.ForEach( e => entities.Add( e.Entity, e.ReferencePaths.OrderBy( p => p.Count ).FirstOrDefault() ) );
+            root.Children = helper.GenerateTree( parent, entities );
+
+            if ( entities.Count > 0 )
+            {
+                throw new Exception( "Found extra entities after building the tree. This shouldn't happen!" );
+            }
+
+            return root;
+        }
 
         /// <summary>
         /// Export a WorkflowType and all required information.
@@ -1046,6 +1108,32 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
         }
 
+        /// <summary>
+        /// Recursively determine the tree structure based on the shortest entity path for each entity.
+        /// </summary>
+        /// <param name="parent">The parent entity that we are currently considering.</param>
+        /// <param name="entities">The full list of entities still available to pick from.</param>
+        /// <returns>The tree from this parent entity on down.</returns>
+        protected List<EntityReferenceTree> GenerateTree( IEntity parent, Dictionary<IEntity, EntityPath> entities )
+        {
+            List<EntityReferenceTree> leafs = new List<EntityReferenceTree>();
+
+            entities.Remove( parent );
+
+            foreach ( var e in entities.Where( x => x.Value.Count > 0 && x.Value.Last().Entity.Guid == parent.Guid ).ToList() )
+            {
+                EntityReferenceTree leaf = new EntityReferenceTree();
+
+                leaf.Entity = e.Key;
+                leaf.PropertyName = e.Value.Last().PropertyName;
+                leaf.Children = GenerateTree( e.Key, entities );
+
+                leafs.Add( leaf );
+            }
+
+            return leafs;
+        }
+
         #endregion
     }
 
@@ -1102,6 +1190,19 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// TODO: This needs to be updated to be JSON encodable. So it should probably have
+    /// a Guid, friendly name, property name and children. The friendly name could be
+    /// based on "Name" or "Value" property if one is available, otherwise "EntityType Guid"
+    /// format.
+    /// </summary>
+    class EntityReferenceTree
+    {
+        public IEntity Entity { get; set; }
+        public string PropertyName { get; set; }
+        public List<EntityReferenceTree> Children { get; set; }
     }
 
     /// <summary>
