@@ -424,6 +424,20 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
         }
 
+        /// <summary>
+        /// Determines the real Entity type of the given IEntity object. Because
+        /// many IEntity objects are dynamic proxies created by Entity Framework
+        /// we need to get the actual underlying type.
+        /// </summary>
+        /// <param name="entity">The entity whose type we want to obtain.</param>
+        /// <returns>The true IEntity type (such as Rock.Model.Person).</returns>
+        static public Type GetEntityType( IEntity entity )
+        {
+            Type type = entity.GetType();
+
+            return type.IsDynamicProxyType() ? type.BaseType : type;
+        }
+
         #endregion
 
         #region Instance Methods
@@ -682,20 +696,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
 
         /// <summary>
-        /// Determines the real Entity type of the given IEntity object. Because
-        /// many IEntity objects are dynamic proxies created by Entity Framework
-        /// we need to get the actual underlying type.
-        /// </summary>
-        /// <param name="entity">The entity whose type we want to obtain.</param>
-        /// <returns>The true IEntity type (such as Rock.Model.Person).</returns>
-        public Type GetEntityType( IEntity entity )
-        {
-            Type type = entity.GetType();
-
-            return type.IsDynamicProxyType() ? type.BaseType : type;
-        }
-
-        /// <summary>
         /// Creates a new map entry for the oldGuid. This generates a new Guid and
         /// stores a reference between the two.
         /// </summary>
@@ -783,7 +783,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             foreach ( var x in FindReferencedEntities( entity ) )
             {
-                exportData.MakeGuidReference( GetEntityType( x.Value ), x.Key, x.Value.Guid );
+                exportData.MakeReference( x.Key, x.Value );
             }
         }
 
@@ -866,6 +866,54 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         processor.PreProcessImportedEntity( entity, encodedEntity, encodedEntity.GetTransform( processorType.Value.FullName ), this );
                     }
 
+                    //
+                    // Special handling of AttributeQualifier because Guids may not be the same
+                    // across installations and the AttributeId+Key columns make up a unique key.
+                    //
+                    if ( encodedEntity.EntityType == "Rock.Model.AttributeQualifier" )
+                    {
+                        var reference = encodedEntity.References.Where( r => r.Property == "AttributeId" ).First();
+                        var attribute = GetExistingEntity( "Rock.Model.Attribute", MapGuid( new Guid( ( string ) reference.Data ) ) );
+                        string key = ( string ) encodedEntity.Properties["Key"];
+
+                        var existingEntity = new AttributeQualifierService( RockContext )
+                            .GetByAttributeId( attribute.Id )
+                            .Where( a => a.Key == key )
+                            .FirstOrDefault();
+
+                        if ( existingEntity != null )
+                        {
+                            if ( entity.Guid != encodedEntity.Guid )
+                            {
+                                throw new Exception( "AttributeQualifier marked for new Guid but conflicting value already exists." );
+                            }
+
+                            GuidMap.AddOrReplace( encodedEntity.Guid, existingEntity.Guid );
+
+                            return existingEntity;
+                        }
+                    }
+
+                    //
+                    // Special handling of Attribute's. The guid's might be different but if the entity type,
+                    // entity qualifiers and key are the same, assume it's the same.
+                    //
+                    else if ( encodedEntity.EntityType == "Rock.Model.Attribute" )
+                    {
+                        var attribute = ( Rock.Model.Attribute ) entity;
+                        var existingEntity = new AttributeService( RockContext )
+                            .GetByEntityTypeId( attribute.EntityTypeId )
+                            .Where( a => a.EntityTypeQualifierColumn == attribute.EntityTypeQualifierColumn && a.EntityTypeQualifierValue == attribute.EntityTypeQualifierValue && a.Key == attribute.Key )
+                            .FirstOrDefault();
+
+                        if ( existingEntity != null )
+                        {
+                            GuidMap.AddOrReplace( encodedEntity.Guid, existingEntity.Guid );
+
+                            return existingEntity;
+                        }
+                    }
+
                     addMethod.Invoke( service, new object[] { entity } );
                     RockContext.SaveChanges( true );
 
@@ -921,8 +969,32 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                     if ( reference != null )
                     {
-                        var otherEntity = GetExistingEntity( reference.EntityType, MapGuid( reference.Guid ) );
+                        object otherEntity = null;
 
+                        //
+                        // Find the referenced entity based on the reference type. This whole section should
+                        // probably be moved into a method of Reference.
+                        //
+                        if ( reference.Type == "Guid" )
+                        {
+                            otherEntity = GetExistingEntity( reference.EntityType, MapGuid( new Guid( ( string ) reference.Data ) ) );
+                        }
+                        else if ( reference.Type == "EntityType" )
+                        {
+                            otherEntity = new EntityTypeService( RockContext ).Queryable().Where( e => e.Name == ( string ) reference.Data ).FirstOrDefault();
+                        }
+                        else if ( reference.Type == "FieldType" )
+                        {
+                            otherEntity = new FieldTypeService( RockContext ).Queryable().Where( f => f.Class == ( string ) reference.Data ).FirstOrDefault();
+                        }
+                        else
+                        {
+                            throw new Exception( string.Format( "Don't know how to handle reference type {0}.", reference.Type ) );
+                        }
+
+                        //
+                        // If we found an entity then get its Id number and store that.
+                        //
                         if ( otherEntity != null )
                         {
                             var idProperty = otherEntity.GetType().GetProperty( "Id" );
@@ -1000,9 +1072,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         public string EntityType { get; set; }
 
         /// <summary>
-        /// The unique identifier of the EntityType to load.
+        /// The type of reference this is.
         /// </summary>
-        public Guid Guid { get; set; }
+        public string Type { get; set; }
+
+        /// <summary>
+        /// The data used to re-create the reference, depends on Type.
+        /// </summary>
+        public object Data { get; set; }
 
         #endregion
 
@@ -1012,14 +1089,16 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// Creates a new entity reference object that is used to reconstruct the
         /// link between two entities in the database.
         /// </summary>
+        /// <param name="referenceType">The type of reference this is.</param>
         /// <param name="property">The name of the property in the containing entity.</param>
         /// <param name="entityType">The referenced entity type name.</param>
-        /// <param name="guid">The identifier of the referenced entity.</param>
-        public Reference( string property, string entityType, Guid guid )
+        /// <param name="data">The data needed to locate the referenced entity.</param>
+        public Reference( string referenceType, string property, string entityType, object data )
         {
             Property = property;
             EntityType = entityType;
-            Guid = guid;
+            Type = referenceType;
+            Data = data;
         }
 
         #endregion
@@ -1117,12 +1196,25 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// object that contains the information we will need to re-create that property
         /// at import time.
         /// </summary>
-        /// <param name="entityType">The data type of the entity being referenced.</param>
         /// <param name="originalProperty">The original property name that we are replacing.</param>
-        /// <param name="guid">The Guid that can be used later to lookup the referenced entity.</param>
-        public void MakeGuidReference( Type entityType, string originalProperty, Guid guid )
+        /// <param name="entity">The entity that is being referenced.</param>
+        public void MakeReference( string originalProperty, IEntity entity )
         {
-            Reference reference = new Reference( originalProperty, entityType.FullName, guid );
+            Reference reference;
+            Type entityType = Helper.GetEntityType( entity );
+
+            if ( entity is EntityType )
+            {
+                reference = new Reference( "EntityType", originalProperty, entityType.FullName, ( ( EntityType ) entity ).Name );
+            }
+            else if ( entity is FieldType )
+            {
+                reference = new Reference( "FieldType", originalProperty, entityType.FullName, ( ( FieldType ) entity ).Class );
+            }
+            else
+            {
+                reference = new Reference( "Guid", originalProperty, entityType.FullName, entity.Guid );
+            }
 
             References.Add( reference );
             Properties.Remove( originalProperty );
