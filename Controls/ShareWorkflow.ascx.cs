@@ -106,7 +106,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         var container = Newtonsoft.Json.JsonConvert.DeserializeObject<DataContainer>( binaryFile.ContentsToString() );
                         List<string> messages;
 
-                        Helper.Import( container, true, rockContext, out messages );
+                        Helper.Import( container, true, new RockContext(), out messages );
                         ltDebug.Text = string.Empty;
                         foreach ( var msg in messages )
                         {
@@ -867,7 +867,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     }
 
                     addMethod.Invoke( service, new object[] { entity } );
-                    RockContext.SaveChanges();
+                    RockContext.SaveChanges( true );
 
                     return entity;
                 }
