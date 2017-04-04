@@ -21,7 +21,7 @@ using Rock.Web.UI;
 namespace RockWeb.Plugins.com_shepherdchurch.Misc
 {
     [DisplayName( "Share Workflow" )]
-    [Category( "com_shepherdchurch > Misc" )]
+    [Category( "Shepherd Church > Misc" )]
     [Description( "Export and import workflows from Rock." )]
 
     public partial class ShareWorkflow : RockBlock
