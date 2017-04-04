@@ -357,6 +357,18 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         private Dictionary<Guid, Guid> GuidMap { get; set; }
 
+        /// <summary>
+        /// Internal list of cached IEntityProcessors that we have created for
+        /// this session.
+        /// </summary>
+        private Dictionary<Type, List<IEntityProcessor>> CachedProcessors { get; set; }
+
+        /// <summary>
+        /// Internal list of cached entity types. This is a map of the full class
+        /// name to the class Type object.
+        /// </summary>
+        private Dictionary<string, Type> CachedEntityTypes { get; set; }
+
         #endregion
 
         #region Static Methods
@@ -461,7 +473,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     //
                     foreach ( var encodedEntity in container.Entities )
                     {
-                        Type entityType = Reflection.FindType( typeof( IEntity ), encodedEntity.EntityType );
+                        Type entityType = helper.FindEntityType( encodedEntity.EntityType );
                         Guid entityGuid = helper.MapGuid( encodedEntity.Guid );
                         var entity = helper.GetExistingEntity( encodedEntity.EntityType, entityGuid );
 
@@ -512,6 +524,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             Entities = new List<QueuedEntity>();
             GuidMap = new Dictionary<Guid, Guid>();
+            CachedEntityTypes = new Dictionary<string, Type>();
+            CachedProcessors = new Dictionary<Type, List<IEntityProcessor>>();
             RockContext = rockContext;
         }
 
@@ -649,11 +663,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             //
             // Allow for processors to adjust the list of children.
             //
-            Type processorBaseType = typeof( EntityProcessor<> ).MakeGenericType( GetEntityType( parentEntity ) );
-            foreach ( var processorType in Reflection.FindTypes( processorBaseType ) )
+            foreach ( var processor in FindEntityProcessors( GetEntityType( parentEntity ) ) )
             {
-                IEntityProcessor processor = ( IEntityProcessor ) Activator.CreateInstance( processorType.Value );
-
                 processor.EvaluateReferencedEntities( parentEntity, children, this );
             }
 
@@ -724,11 +735,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             //
             // Allow for processors to adjust the list of children.
             //
-            Type processorBaseType = typeof( EntityProcessor<> ).MakeGenericType( GetEntityType( parentEntity ) );
-            foreach ( var processorType in Reflection.FindTypes( processorBaseType ) )
+            foreach ( var processor in FindEntityProcessors( GetEntityType( parentEntity ) ) )
             {
-                IEntityProcessor processor = ( IEntityProcessor ) Activator.CreateInstance( processorType.Value );
-
                 processor.EvaluateChildEntities( parentEntity, children, this );
             }
 
@@ -857,7 +865,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <returns>The loaded entity or null if not found.</returns>
         public IEntity GetExistingEntity( string entityType, Guid guid )
         {
-            var service = Reflection.GetServiceForEntityType( Reflection.FindType( typeof( IEntity ), entityType ), RockContext );
+            var service = Reflection.GetServiceForEntityType( FindEntityType( entityType ), RockContext );
 
             if ( service != null )
             {
@@ -880,7 +888,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <returns>The loaded entity or null if not found.</returns>
         public IEntity GetExistingEntity( string entityType, int id )
         {
-            var service = Reflection.GetServiceForEntityType( Reflection.FindType( typeof( IEntity ), entityType ), RockContext );
+            var service = Reflection.GetServiceForEntityType( FindEntityType( entityType ), RockContext );
 
             if ( service != null )
             {
@@ -920,12 +928,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     //
                     // Do custom pre-save processing.
                     //
-                    Type processorBaseType = typeof( EntityProcessor<> ).MakeGenericType( entityType );
-                    foreach ( var processorType in Reflection.FindTypes( processorBaseType ) )
+                    foreach ( var processor in FindEntityProcessors( entityType ) )
                     {
-                        IEntityProcessor processor = ( IEntityProcessor ) Activator.CreateInstance( processorType.Value );
-
-                        processor.PreProcessImportedEntity( entity, encodedEntity, encodedEntity.GetTransform( processorType.Value.FullName ), this );
+                        processor.PreProcessImportedEntity( entity, encodedEntity, encodedEntity.GetTransform( processor.GetType().FullName ), this );
                     }
 
                     //
@@ -1106,6 +1111,54 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     return Convert.ChangeType( obj, t );
                 }
             }
+        }
+
+        /// <summary>
+        /// Find the given IEntity Type from the full class name. Uses a cache to
+        /// save processing time.
+        /// </summary>
+        /// <param name="entityName">The full class name of the IEntity type.</param>
+        /// <returns>The Type object for the class name or null if not found.</returns>
+        public Type FindEntityType( string entityName )
+        {
+            if ( CachedEntityTypes.ContainsKey( entityName ) )
+            {
+                return CachedEntityTypes[entityName];
+            }
+
+            Type type = Reflection.FindType( typeof( IEntity ), entityName );
+
+            if ( type != null )
+            {
+                CachedEntityTypes.Add( entityName, type );
+            }
+
+            return type;
+        }
+
+        /// <summary>
+        /// Retrieve an enumerable list of processor objects for the given
+        /// IEntity type.
+        /// </summary>
+        /// <param name="entityType">The Type object of the IEntity to get processors for.</param>
+        /// <returns>Enumerable of IEntityProcessor objects that will pre- and post-process this entity.</returns>
+        public IEnumerable<IEntityProcessor> FindEntityProcessors( Type entityType )
+        {
+            if ( CachedProcessors.ContainsKey( entityType ) )
+            {
+                return CachedProcessors[entityType];
+            }
+
+            Type processorBaseType = typeof( EntityProcessor<> ).MakeGenericType( entityType );
+            List<IEntityProcessor> processors = new List<IEntityProcessor>();
+            foreach ( var processorType in Reflection.FindTypes( processorBaseType ) )
+            {
+                processors.Add( ( IEntityProcessor ) Activator.CreateInstance( processorType.Value ) );
+            }
+
+            CachedProcessors.Add( entityType, processors );
+
+            return processors;
         }
 
         /// <summary>
@@ -1530,7 +1583,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             if ( entity.EntityTypeQualifierColumn.EndsWith( "Id" ) && int.TryParse( entity.EntityTypeQualifierValue, out entityId ) )
             {
-                var entityType = Reflection.FindType( typeof( IEntity ), entity.EntityType.Name );
+                var entityType = helper.FindEntityType( entity.EntityType.Name );
 
                 if ( entityType != null )
                 {
