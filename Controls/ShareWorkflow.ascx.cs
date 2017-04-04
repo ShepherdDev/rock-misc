@@ -369,6 +369,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         private Dictionary<string, Type> CachedEntityTypes { get; set; }
 
+        /// <summary>
+        /// Internal list of cached PropertyInfo definitions for the given Type.
+        /// </summary>
+        private Dictionary<Type, List<PropertyInfo>> CachedEntityProperties { get; set; }
+
         #endregion
 
         #region Static Methods
@@ -526,6 +531,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             GuidMap = new Dictionary<Guid, Guid>();
             CachedEntityTypes = new Dictionary<string, Type>();
             CachedProcessors = new Dictionary<Type, List<IEntityProcessor>>();
+            CachedEntityProperties = new Dictionary<Type, List<PropertyInfo>>();
             RockContext = rockContext;
         }
 
@@ -750,19 +756,25 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <returns></returns>
         public List<PropertyInfo> GetEntityProperties( IEntity entity )
         {
-            //
-            // Get all data member mapped properties and filter out any "local only"
-            // properties that should not be exported.
-            //
-            return GetEntityType( entity )
-                .GetProperties()
-                .Where( p => System.Attribute.IsDefined( p, typeof( DataMemberAttribute ) ) )
-                .Where( p => !System.Attribute.IsDefined( p, typeof( NotMappedAttribute ) ) )
-                .Where( p => !System.Attribute.IsDefined( p, typeof( DatabaseGeneratedAttribute ) ) )
-                .Where( p => p.Name != "Id" && p.Name != "Guid" )
-                .Where( p => p.Name != "ForeignId" && p.Name != "ForeignGuid" && p.Name != "ForeignKey" )
-                .Where( p => p.Name != "CreatedByPersonAliasId" && p.Name != "ModifiedByPersonAliasId" )
-                .ToList();
+            Type entityType = GetEntityType( entity );
+
+            if ( !CachedEntityProperties.ContainsKey( entityType ) )
+            {
+                //
+                // Get all data member mapped properties and filter out any "local only"
+                // properties that should not be exported.
+                //
+                CachedEntityProperties.Add( entityType, entityType.GetProperties()
+                    .Where( p => System.Attribute.IsDefined( p, typeof( DataMemberAttribute ) ) )
+                    .Where( p => !System.Attribute.IsDefined( p, typeof( NotMappedAttribute ) ) )
+                    .Where( p => !System.Attribute.IsDefined( p, typeof( DatabaseGeneratedAttribute ) ) )
+                    .Where( p => p.Name != "Id" && p.Name != "Guid" )
+                    .Where( p => p.Name != "ForeignId" && p.Name != "ForeignGuid" && p.Name != "ForeignKey" )
+                    .Where( p => p.Name != "CreatedByPersonAliasId" && p.Name != "ModifiedByPersonAliasId" )
+                    .ToList() );
+            }
+
+            return CachedEntityProperties[entityType];
         }
 
         /// <summary>
