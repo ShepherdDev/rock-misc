@@ -418,6 +418,35 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             }
         }
 
+        /// <summary>
+        /// Get a friendly name for the entity, optionally including the short name for the
+        /// entity type. This attempts a ToString() on the entity and if that returns what
+        /// appears to be a valid name (no &lt; character and less than 40 characters) then
+        /// it us used as the name. Otherwise the Guid is used for the name.
+        /// </summary>
+        /// <param name="entity">The entity whose name we wish to retrieve.</param>
+        /// <param name="includeType">If true include the short type name.</param>
+        /// <returns>A string that can be displayed to the user to identify this entity.</returns>
+        static public string EntityFriendlyName( IEntity entity, bool includeType )
+        {
+            string name;
+
+            name = entity.ToString();
+            if ( name.Length > 40 || name.Contains( "<" ) )
+            {
+                name = entity.Guid.ToString();
+            }
+
+            if ( includeType )
+            {
+                return string.Format( "{0} ({1})", name, GetEntityType( entity ).Name );
+            }
+            else
+            {
+                return name;
+            }
+        }
+
         #endregion
 
         #region Instance Methods
