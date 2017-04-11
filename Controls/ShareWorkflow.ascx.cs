@@ -80,7 +80,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             RockContext rockContext = new RockContext();
             var workflowTypeService = new WorkflowTypeService( rockContext );
             var workflowType = workflowTypeService.Get( wtpExport.SelectedValueAsId().Value );
-            var exporter = new Export.WorkflowTypeExporter( new RockContext() );
+            var helper = new Export.Helper( new RockContext() );
+            var exporter = new Export.WorkflowTypeExporter( helper );
 
             var tree = exporter.Preview( workflowType );
 
@@ -88,7 +89,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             buildTree = ( sb, parent, indent ) => {
                 if ( indent == string.Empty )
                 {
-                    sb.AppendLine( string.Format( "{0} {1}", Export.Helper.GetEntityType( parent.Entity ).FullName, parent.Entity.Guid ) );
+                    sb.AppendLine( string.Format( "<b>{0}</b> {1}{2}", parent.Name ?? parent.Guid.ToString(), parent.EntityType, parent.IsCritical ? " **" : "" ) );
                 }
 
                 if ( parent.Children.Any() )
@@ -97,7 +98,10 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     foreach ( var c in parent.Children )
                     {
                         sb.Append( indent + ( c == last ? " \\- " : " |- " ) );
-                        sb.AppendLine( string.Format( "{0}: {1} {2}", c.PropertyName, Export.Helper.GetEntityType( c.Entity ).FullName, c.Entity.Guid ) );
+                        if ( c.IsCritical )
+                        {
+                        }
+                        sb.AppendLine( string.Format( "{0}: <b>{1}</b> {2}{3}", c.PropertyName, c.Name ?? c.Guid.ToString(), c.EntityType, c.IsCritical ? " **" : "" ) );
 
                         buildTree( sb, c, indent + ( c == last ? "    " : " |  " ) );
                     }
@@ -114,7 +118,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             RockContext rockContext = new RockContext();
             var workflowTypeService = new WorkflowTypeService( rockContext );
             var workflowType = workflowTypeService.Get( wtpExport.SelectedValueAsId().Value );
-            var exporter = new Export.WorkflowTypeExporter( new RockContext() );
+            var helper = new Export.Helper( new RockContext() );
+            var exporter = new Export.WorkflowTypeExporter( helper );
             var container = exporter.Export( workflowType );
 
             Page.EnableViewState = false;
@@ -162,22 +167,31 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
 namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
 {
-    public class WorkflowTypeExporter : Helper, IExporter<WorkflowType>
+    public class WorkflowTypeExporter : IExporter, IExporter<WorkflowType>
     {
-        public WorkflowTypeExporter( RockContext dbContext ) : base( dbContext )
+        Helper Helper { get; set; }
+
+        public WorkflowTypeExporter( Helper helper )
         {
-            EntityNeedsGuid = ( queuedEntity ) =>
-            {
-                return ( queuedEntity.ContainsPropertyPath( "AttributeTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "AttributeTypes.AttributeQualifiers" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.AttributeTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.AttributeTypes.AttributeQualifiers" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.AttributeValues" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.WorkflowFormId" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.WorkflowFormId.FormAttributes" ) );
-            };
+            Helper = helper;
+        }
+
+        public bool PathNeedsNewGuid( EntityPath path )
+        {
+            return ( path == "AttributeTypes" ||
+                path == "AttributeTypes.AttributeQualifiers" ||
+                path == "ActivityTypes" ||
+                path == "ActivityTypes.AttributeTypes" ||
+                path == "ActivityTypes.AttributeTypes.AttributeQualifiers" ||
+                path == "ActivityTypes.ActionTypes" ||
+                path == "ActivityTypes.ActionTypes.AttributeValues" ||
+                path == "ActivityTypes.ActionTypes.WorkflowFormId" ||
+                path == "ActivityTypes.ActionTypes.WorkflowFormId.FormAttributes" );
+        }
+
+        public bool IsPathCritical( EntityPath path )
+        {
+            return ( PathNeedsNewGuid( path ) );
         }
 
         /// <summary>
@@ -189,7 +203,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         {
             Helper helper = new Helper( new RockContext() );
 
-            helper.EnqueueEntity( entity, new EntityPath() );
+            helper.EnqueueEntity( entity, new EntityPath(), true, this );
 
             return helper.ProcessQueue();
         }
@@ -206,15 +220,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             Helper helper = new Helper( new RockContext() );
             List<string> ignoredEntityTypes = new List<string>();
 
-            EntityReferenceTree root = new EntityReferenceTree();
-            root.Entity = entity;
-            root.PropertyName = string.Empty;
-
-            helper.EnqueueEntity( entity, new EntityPath() );
+            helper.EnqueueEntity( entity, new EntityPath(), true, this );
 
             Dictionary<IEntity, EntityPath> entities = new Dictionary<IEntity, EntityPath>();
             helper.Entities.ForEach( e => entities.Add( e.Entity, e.ReferencePaths.OrderBy( p => p.Count ).FirstOrDefault() ) );
-            root.Children = helper.GenerateTree( entity, entities );
+            EntityReferenceTree root = new EntityReferenceTree( entity, string.Empty, helper.GenerateTree( entity, entities ) );
 
             if ( entities.Count > 0 )
             {
@@ -238,6 +248,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         EntityReferenceTree Preview( T entity );
     }
 
+    public interface IExporter
+    {
+        bool IsPathCritical( EntityPath queuedEntity );
+        bool PathNeedsNewGuid( EntityPath queuedEntity );
+    }
+
     /// <summary>
     /// A helper class for importing / exporting entities into and out of Rock.
     /// </summary>
@@ -258,6 +274,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         public RockContext RockContext { get; private set; }
 
         protected Func<QueuedEntity, bool> EntityNeedsGuid { get; set; }
+
+        protected Func<IEntity, string, bool> ShouldDescend { get; set; }
 
         /// <summary>
         /// The map of original Guids to newly generated Guids.
@@ -464,7 +482,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         /// </summary>
         /// <param name="entity">The entity that is to be included in the export.</param>
         /// <param name="path">The entity path that lead to this entity being encoded.</param>
-        public void EnqueueEntity( IEntity entity, EntityPath path )
+        /// <param name="entityIsCritical">True if the entity is critical, that is referenced directly.</param>
+        public void EnqueueEntity( IEntity entity, EntityPath path, bool entityIsCritical, IExporter exporter )
         {
             List<KeyValuePair<string, IEntity>> entities;
 
@@ -490,7 +509,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             // exist before this one can be created.
             //
             entities = FindReferencedEntities( entity );
-            entities.ForEach( e => EnqueueEntity( e.Value, path.PathByAddingComponent( new EntityPathComponent( entity, e.Key ) ) ) );
+            entities.ForEach( e => EnqueueEntity( e.Value, path.PathByAddingComponent( new EntityPathComponent( entity, e.Key ) ), true, exporter ) );
 
             //
             // If we already know about the entity, add a reference to it and return.
@@ -498,11 +517,21 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             var queuedEntity = Entities.Where( e => e.Entity.Guid == entity.Guid ).FirstOrDefault();
             if ( queuedEntity == null )
             {
-                Entities.Add( queuedEntity = new QueuedEntity( entity, path.Clone() ) );
+                queuedEntity = new QueuedEntity( entity, path.Clone() );
+                Entities.Add( queuedEntity );
             }
             else
             {
                 queuedEntity.AddReferencePath( path.Clone() );
+            }
+
+            if ( !queuedEntity.Flags.HasFlag( QueuedEntityFlags.Critical ) && ( path.Count == 0 || entityIsCritical || exporter.IsPathCritical( path ) ) )
+            {
+                queuedEntity.Flags |= QueuedEntityFlags.Critical;
+            }
+            if ( !queuedEntity.Flags.HasFlag( QueuedEntityFlags.NewGuid ) && exporter.PathNeedsNewGuid( path ) )
+            {
+                queuedEntity.Flags |= QueuedEntityFlags.NewGuid;
             }
 
             //
@@ -511,7 +540,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             // get a list of the WorkflowActions).
             //
             entities = FindChildEntities( entity );
-            entities.ForEach( e => EnqueueEntity( e.Value, path.PathByAddingComponent( new EntityPathComponent( entity, e.Key ) ) ) );
+            entities.ForEach( e => EnqueueEntity( e.Value, path.PathByAddingComponent( new EntityPathComponent( entity, e.Key ) ), false, exporter ) );
         }
 
         /// <summary>
@@ -987,12 +1016,10 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
 
             foreach ( var e in entities.Where( x => x.Value.Count > 0 && x.Value.Last().Entity.Guid == parent.Guid ).ToList() )
             {
-                EntityReferenceTree leaf = new EntityReferenceTree();
+                EntityReferenceTree leaf = new EntityReferenceTree( e.Key, e.Value.Last().PropertyName, GenerateTree( e.Key, entities ) );
+                var queuedEntity = Entities.Where( et => et.Entity == e.Key ).First();
 
-                leaf.Entity = e.Key;
-                leaf.PropertyName = e.Value.Last().PropertyName;
-                leaf.Children = GenerateTree( e.Key, entities );
-
+                leaf.IsCritical = queuedEntity.Flags.HasFlag( QueuedEntityFlags.Critical );
                 leafs.Add( leaf );
             }
 
@@ -1065,7 +1092,40 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             return path;
         }
 
+        public static bool operator ==( EntityPath a, string b )
+        {
+            var properties = b.Split( '.' );
+
+            if ( a.Count == properties.Length )
+            {
+                int i = 0;
+                for ( i = 0; i < a.Count; i++ )
+                {
+                    if ( a[i].PropertyName != properties[i] )
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool operator !=( EntityPath a, string b )
+        {
+            return !( a == b );
+        }
+
         #endregion
+    }
+
+    [Flags]
+    public enum QueuedEntityFlags
+    {
+        NewGuid = 0x01,
+        Critical = 0x02
     }
 
     /// <summary>
@@ -1084,6 +1144,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         /// A list of all paths that we took to reach this entity.
         /// </summary>
         public List<EntityPath> ReferencePaths { get; private set; }
+
+        public QueuedEntityFlags Flags { get; set; }
 
         /// <summary>
         /// During the encode process this will be filled in with the encoded
@@ -1312,10 +1374,26 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
     /// </summary>
     public class EntityReferenceTree
     {
-        public IEntity Entity { get; set; }
-        public string PropertyName { get; set; }
-        public List<EntityReferenceTree> Children { get; set; }
+        public string EntityType { get; private set; }
+        public Guid Guid { get; private set; }
+        public string Name { get; private set; }
+        public string PropertyName { get; private set; }
+        public List<EntityReferenceTree> Children { get; private set; }
+        public bool IsCritical { get; set; }
 
+        public EntityReferenceTree( IEntity entity, string propertyName, List<EntityReferenceTree> children )
+        {
+            EntityType = Helper.GetEntityType( entity ).FullName;
+            Guid = entity.Guid;
+            PropertyName = propertyName;
+            Children = children;
+
+            Name = entity.GetPropertyValue( "Name" ) as string;
+            if ( Name == null )
+            {
+                Name = entity.GetPropertyValue( "Value" ) as string;
+            }
+        }
 
         /// <summary>
         /// Cleans the entire reference tree. Any leaf that is an ignored entity type and
@@ -1345,7 +1423,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         /// <returns>true if the tree, including this entity, contains only entities from the given list. Otherwise false.</returns>
         protected bool TreeContainsOnlyTypes( List<string> types )
         {
-            if ( !types.Contains( Helper.GetEntityType( Entity ).FullName ) )
+            if ( !types.Contains( EntityType ) )
             {
                 return false;
             }
@@ -1618,7 +1696,10 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             return false;
         }
     }
+}
 
+namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
+{
     class WorkflowTypeProcessor : EntityProcessor<WorkflowType>
     {
         protected override void EvaluateChildEntities( WorkflowType entity, List<KeyValuePair<string, IEntity>> children, Helper helper )
