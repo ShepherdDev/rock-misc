@@ -98,9 +98,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     foreach ( var c in parent.Children )
                     {
                         sb.Append( indent + ( c == last ? " \\- " : " |- " ) );
-                        if ( c.IsCritical )
-                        {
-                        }
                         sb.AppendLine( string.Format( "{0}: <b>{1}</b> {2}{3}", c.PropertyName, c.Name ?? c.Guid.ToString(), c.EntityType, c.IsCritical ? " **" : "" ) );
 
                         buildTree( sb, c, indent + ( c == last ? "    " : " |  " ) );
@@ -483,7 +480,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             {
                 queuedEntity.EncodedEntity = Export( queuedEntity.Entity );
 
-                if ( queuedEntity.ReferencePaths[0].Count == 0 || EntityNeedsGuid( queuedEntity ) )
+                if ( queuedEntity.ReferencePaths[0].Count == 0 || queuedEntity.Flags.HasFlag( QueuedEntityFlags.NewGuid ) )
                 {
                     queuedEntity.EncodedEntity.NewGuid = true;
                 }
@@ -551,6 +548,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             }
             else
             {
+                //
+                // We have already visited this entity from the same parent. Not sure why we are here.
+                //
+                if ( path.Any() && queuedEntity.ReferencePaths.Where( r => r.Any() && r.Last().Entity.Guid == path.Last().Entity.Guid ).Any() )
+                {
+                    return;
+                }
+
                 queuedEntity.AddReferencePath( path.Clone() );
             }
 
