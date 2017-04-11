@@ -80,14 +80,15 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             RockContext rockContext = new RockContext();
             var workflowTypeService = new WorkflowTypeService( rockContext );
             var workflowType = workflowTypeService.Get( wtpExport.SelectedValueAsId().Value );
+            var exporter = new Export.WorkflowTypeExporter( new RockContext() );
 
-            var tree = Helper.GenerateTree( workflowType );
+            var tree = exporter.Preview( workflowType );
 
-            Action<StringBuilder, EntityReferenceTree, string> buildTree = null;
+            Action<StringBuilder, Export.EntityReferenceTree, string> buildTree = null;
             buildTree = ( sb, parent, indent ) => {
                 if ( indent == string.Empty )
                 {
-                    sb.AppendLine( string.Format( "{0} {1}", Helper.GetEntityType( parent.Entity ).FullName, parent.Entity.Guid ) );
+                    sb.AppendLine( string.Format( "{0} {1}", Export.Helper.GetEntityType( parent.Entity ).FullName, parent.Entity.Guid ) );
                 }
 
                 if ( parent.Children.Any() )
@@ -96,7 +97,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     foreach ( var c in parent.Children )
                     {
                         sb.Append( indent + ( c == last ? " \\- " : " |- " ) );
-                        sb.AppendLine( string.Format( "{0}: {1} {2}", c.PropertyName, Helper.GetEntityType( c.Entity ).FullName, c.Entity.Guid ) );
+                        sb.AppendLine( string.Format( "{0}: {1} {2}", c.PropertyName, Export.Helper.GetEntityType( c.Entity ).FullName, c.Entity.Guid ) );
 
                         buildTree( sb, c, indent + ( c == last ? "    " : " |  " ) );
                     }
@@ -113,8 +114,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             RockContext rockContext = new RockContext();
             var workflowTypeService = new WorkflowTypeService( rockContext );
             var workflowType = workflowTypeService.Get( wtpExport.SelectedValueAsId().Value );
-
-            var container = Helper.ExportWorkflowType( workflowType );
+            var exporter = new Export.WorkflowTypeExporter( new RockContext() );
+            var container = exporter.Export( workflowType );
 
             Page.EnableViewState = false;
             Page.Response.Clear();
@@ -136,10 +137,10 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 {
                     try
                     {
-                        var container = Newtonsoft.Json.JsonConvert.DeserializeObject<DataContainer>( binaryFile.ContentsToString() );
+                        var container = Newtonsoft.Json.JsonConvert.DeserializeObject<Export.DataContainer>( binaryFile.ContentsToString() );
                         List<string> messages;
 
-                        Helper.Import( container, true, new RockContext(), out messages );
+                        Export.Helper.Import( container, true, new RockContext(), out messages );
                         ltDebug.Text = string.Empty;
                         foreach ( var msg in messages )
                         {
@@ -157,186 +158,90 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
         }
     }
+}
 
-    /// <summary>
-    /// Describes a single element of an entity path.
-    /// </summary>
-    class EntityPathComponent
+namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
+{
+    public class WorkflowTypeExporter : Helper, IExporter<WorkflowType>
     {
-        /// <summary>
-        /// The entity at this specific location in the path.
-        /// </summary>
-        public IEntity Entity { get; private set; }
-
-        /// <summary>
-        /// The name of the property used to reach the next location in the path.
-        /// </summary>
-        public string PropertyName { get; private set; }
-
-        /// <summary>
-        /// Create a new entity path component.
-        /// </summary>
-        /// <param name="entity">The entity at this specific location in the path.</param>
-        /// <param name="propertyName">The name of the property used to reach the next location in the path.</param>
-        public EntityPathComponent( IEntity entity, string propertyName )
+        public WorkflowTypeExporter( RockContext dbContext ) : base( dbContext )
         {
-            Entity = entity;
-            PropertyName = propertyName;
+            EntityNeedsGuid = ( queuedEntity ) =>
+            {
+                return ( queuedEntity.ContainsPropertyPath( "AttributeTypes" ) ||
+                    queuedEntity.ContainsPropertyPath( "AttributeTypes.AttributeQualifiers" ) ||
+                    queuedEntity.ContainsPropertyPath( "ActivityTypes" ) ||
+                    queuedEntity.ContainsPropertyPath( "ActivityTypes.AttributeTypes" ) ||
+                    queuedEntity.ContainsPropertyPath( "ActivityTypes.AttributeTypes.AttributeQualifiers" ) ||
+                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes" ) ||
+                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.AttributeValues" ) ||
+                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.WorkflowFormId" ) ||
+                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.WorkflowFormId.FormAttributes" ) );
+            };
+        }
+
+        /// <summary>
+        /// Export a WorkflowType and all required information.
+        /// </summary>
+        /// <param name="entity">The WorkflowType to be exported.</param>
+        /// <returns>A DataContainer that is ready to be encoded and saved.</returns>
+        public DataContainer Export( WorkflowType entity )
+        {
+            Helper helper = new Helper( new RockContext() );
+
+            helper.EnqueueEntity( entity, new EntityPath() );
+
+            return helper.ProcessQueue();
+        }
+
+        /// <summary>
+        /// Generate a tree of all entities that can be exported from the parent entity.
+        /// This can be used to present to the user and ask them if there are any entities
+        /// they do not wish to export.
+        /// </summary>
+        /// <param name="entity">The root entity that is going to be exported.</param>
+        /// <returns>An object that represents the entity tree.</returns>
+        public EntityReferenceTree Preview( WorkflowType entity )
+        {
+            Helper helper = new Helper( new RockContext() );
+            List<string> ignoredEntityTypes = new List<string>();
+
+            EntityReferenceTree root = new EntityReferenceTree();
+            root.Entity = entity;
+            root.PropertyName = string.Empty;
+
+            helper.EnqueueEntity( entity, new EntityPath() );
+
+            Dictionary<IEntity, EntityPath> entities = new Dictionary<IEntity, EntityPath>();
+            helper.Entities.ForEach( e => entities.Add( e.Entity, e.ReferencePaths.OrderBy( p => p.Count ).FirstOrDefault() ) );
+            root.Children = helper.GenerateTree( entity, entities );
+
+            if ( entities.Count > 0 )
+            {
+                throw new Exception( "Found extra entities after building the tree. This shouldn't happen!" );
+            }
+
+            ignoredEntityTypes.Add( "Rock.Model.Attribute" );
+            ignoredEntityTypes.Add( "Rock.Model.AttributeValue" );
+            ignoredEntityTypes.Add( "Rock.Model.AttributeQualifier" );
+            ignoredEntityTypes.Add( "Rock.Model.WorkflowActionFormAttribute" );
+            ignoredEntityTypes.Add( "Rock.Model.SystemEmail" );
+            root.CleanTree( ignoredEntityTypes );
+
+            return root;
         }
     }
 
-    /// <summary>
-    /// Describes the entity and property path used to reach this point in
-    /// the entity tree.
-    /// </summary>
-    class EntityPath : List<EntityPathComponent>
+    interface IExporter<T>
     {
-        #region Instance Methods
-
-        /// <summary>
-        /// Create a duplicate copy of this entity path and return it.
-        /// </summary>
-        /// <returns>A duplicate of this entity path.</returns>
-        public EntityPath Clone()
-        {
-            EntityPath path = new EntityPath();
-
-            path.AddRange( this );
-
-            return path;
-        }
-
-        /// <summary>
-        /// Create a new EntityPath by appending the path component. The original
-        /// path is not modified.
-        /// </summary>
-        /// <param name="component">The new path component to append to this path.</param>
-        /// <returns></returns>
-        public EntityPath PathByAddingComponent( EntityPathComponent component )
-        {
-            EntityPath path = this.Clone();
-
-            path.Add( component );
-
-            return path;
-        }
-
-        #endregion
-    }
-
-    /// <summary>
-    /// Tracks entities and related information of entities that are queued up to be encoded.
-    /// </summary>
-    class QueuedEntity
-    {
-        #region Properties
-
-        /// <summary>
-        /// The entity that is queued up for processing.
-        /// </summary>
-        public IEntity Entity { get; private set; }
-
-        /// <summary>
-        /// A list of all paths that we took to reach this entity.
-        /// </summary>
-        public List<EntityPath> ReferencePaths { get; private set; }
-
-        /// <summary>
-        /// During the encode process this will be filled in with the encoded
-        /// entity data so that we can keep a link between the IEntity and the
-        /// encoded data until we are done.
-        /// </summary>
-        public EncodedEntity EncodedEntity { get; set; }
-
-        #endregion
-
-        #region Instance Methods
-
-        /// <summary>
-        /// Initialize a new queued entity for the given access path.
-        /// </summary>
-        /// <param name="entity">The entity that is going to be placed in the queue.</param>
-        /// <param name="path">The initial path used to reach this entity.</param>
-        public QueuedEntity( IEntity entity, EntityPath path )
-        {
-            Entity = entity;
-            ReferencePaths = new List<EntityPath>();
-            ReferencePaths.Add( path );
-        }
-
-        /// <summary>
-        /// Add a new entity path reference to this existing entity.
-        /// </summary>
-        /// <param name="path">The path that can be used to reach this entity.</param>
-        public void AddReferencePath( EntityPath path )
-        {
-            ReferencePaths.Add( path );
-        }
-
-        /// <summary>
-        /// This is used for debug output to display the entity information and the path(s)
-        /// that we took to find it.
-        /// </summary>
-        /// <returns>A string that describes this queued entity.</returns>
-        public override string ToString()
-        {
-            StringBuilder sb = new StringBuilder();
-            EntityPath primaryPath = ReferencePaths[0];
-
-            sb.AppendFormat( "{0} {1}", Entity.TypeName, Entity.Guid );
-            foreach ( var p in ReferencePaths )
-            {
-                sb.AppendFormat( "\n\tPath" );
-                foreach ( var e in p )
-                {
-                    sb.AppendFormat( "\n\t\t{0} {2} {1}", e.Entity.TypeName, e.PropertyName, e.Entity.Guid );
-                }
-            }
-
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// Checks if this entity can be reached by the property path. For example if exporting a
-        /// WorkflowType and you want to check if this entity is a WorkflowActionType for this
-        /// workflow then you would use the property path "ActivityTypes.ActionTypes".
-        /// </summary>
-        /// <param name="propertyPath">The period delimited list of properties to reach this entity.</param>
-        /// <returns>true if this entity can be reached by the property path, false if not.</returns>
-        public bool ContainsPropertyPath( string propertyPath )
-        {
-            var properties = propertyPath.Split( '.' );
-
-            foreach ( var path in ReferencePaths )
-            {
-                if ( path.Count == properties.Length )
-                {
-                    int i = 0;
-                    for ( i = 0; i < path.Count; i++ )
-                    {
-                        if ( path[i].PropertyName != properties[i] )
-                        {
-                            break;
-                        }
-                    }
-
-                    if ( i == path.Count )
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        #endregion
+        DataContainer Export( T entity );
+        EntityReferenceTree Preview( T entity );
     }
 
     /// <summary>
     /// A helper class for importing / exporting entities into and out of Rock.
     /// </summary>
-    class Helper
+    public class Helper
     {
         #region Properties
 
@@ -351,6 +256,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// The database context to perform all our operations in.
         /// </summary>
         public RockContext RockContext { get; private set; }
+
+        protected Func<QueuedEntity, bool> EntityNeedsGuid { get; set; }
 
         /// <summary>
         /// The map of original Guids to newly generated Guids.
@@ -377,67 +284,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         #endregion
 
         #region Static Methods
-
-        /// <summary>
-        /// Generate  atree of all entities that can be exported from the parent entity.
-        /// This can be used to present to the user and ask them if there are any entities
-        /// they do not wish to export.
-        /// </summary>
-        /// <param name="parent">The root entity that is going to be exported.</param>
-        /// <returns>An object that represents the entity tree.</returns>
-        static public EntityReferenceTree GenerateTree( IEntity parent )
-        {
-            Helper helper = new Helper( new RockContext() );
-
-            EntityReferenceTree root = new EntityReferenceTree();
-            root.Entity = parent;
-            root.PropertyName = string.Empty;
-
-            helper.EnqueueEntity( parent, new EntityPath() );
-
-            Dictionary<IEntity, EntityPath> entities = new Dictionary<IEntity, EntityPath>();
-            helper.Entities.ForEach( e => entities.Add( e.Entity, e.ReferencePaths.OrderBy( p => p.Count ).FirstOrDefault() ) );
-            root.Children = helper.GenerateTree( parent, entities );
-
-            if ( entities.Count > 0 )
-            {
-                throw new Exception( "Found extra entities after building the tree. This shouldn't happen!" );
-            }
-
-            return root;
-        }
-
-        /// <summary>
-        /// Export a WorkflowType and all required information.
-        /// </summary>
-        /// <param name="workflowType">The WorkflowType to be exported.</param>
-        /// <returns>A DataContainer that is ready to be encoded and saved.</returns>
-        static public DataContainer ExportWorkflowType( WorkflowType workflowType )
-        {
-            Helper helper = new Helper( new RockContext() );
-
-            helper.EnqueueEntity( workflowType, new EntityPath() );
-
-            return helper.ProcessQueue( ( queuedEntity ) =>
-            {
-                if ( queuedEntity.ContainsPropertyPath( "AttributeTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "AttributeTypes.AttributeQualifiers" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.AttributeTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.AttributeTypes.AttributeQualifiers" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.AttributeValues" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.WorkflowFormId" ) ||
-                    queuedEntity.ContainsPropertyPath( "ActivityTypes.ActionTypes.WorkflowFormId.FormAttributes" ) )
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            } );
-        }
 
         /// <summary>
         /// Attempt to import the container of entities into the Rock database. Creates
@@ -517,6 +363,43 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             return type.IsDynamicProxyType() ? type.BaseType : type;
         }
 
+        /// <summary>
+        /// Convert the given object value to the target type. This extends
+        /// the IConvertable.ChangeType support since some things don't
+        /// implement IConvertable, like Guid and Nullable.
+        /// </summary>
+        /// <param name="t">The target data type to convert to.</param>
+        /// <param name="obj">The object value to be converted.</param>
+        /// <returns>The value converted to the target type.</returns>
+        static public object ChangeType( Type t, object obj )
+        {
+            Type u = Nullable.GetUnderlyingType( t );
+
+            if ( u != null )
+            {
+                return ( obj == null ) ? null : ChangeType( u, obj );
+            }
+            else
+            {
+                if ( t.IsEnum )
+                {
+                    return Enum.Parse( t, obj.ToString() );
+                }
+                else if ( t == typeof( Guid ) && obj is string )
+                {
+                    return new Guid( ( string ) obj );
+                }
+                else if ( t == typeof( string ) && obj is Guid )
+                {
+                    return obj.ToString();
+                }
+                else
+                {
+                    return Convert.ChangeType( obj, t );
+                }
+            }
+        }
+
         #endregion
 
         #region Instance Methods
@@ -525,7 +408,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// Initialize a new Helper object for facilitating the export/import of entities.
         /// </summary>
         /// <param name="rockContext">The RockContext to work in when exporting or importing.</param>
-        protected Helper( RockContext rockContext )
+        public Helper( RockContext rockContext )
         {
             Entities = new List<QueuedEntity>();
             GuidMap = new Dictionary<Guid, Guid>();
@@ -542,7 +425,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         /// <param name="guidEvaluation">A function that is called for each entity to determine if it needs a new Guid or not.</param>
         /// <returns>A DataContainer that is ready for JSON export.</returns>
-        protected DataContainer ProcessQueue( Func<QueuedEntity, bool> guidEvaluation )
+        public DataContainer ProcessQueue()
         {
             DataContainer container = new DataContainer();
 
@@ -553,7 +436,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             {
                 queuedEntity.EncodedEntity = Export( queuedEntity.Entity );
 
-                if ( queuedEntity.ReferencePaths[0].Count == 0 || guidEvaluation( queuedEntity ) )
+                if ( queuedEntity.ReferencePaths[0].Count == 0 || EntityNeedsGuid( queuedEntity ) )
                 {
                     queuedEntity.EncodedEntity.NewGuid = true;
                 }
@@ -581,7 +464,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         /// <param name="entity">The entity that is to be included in the export.</param>
         /// <param name="path">The entity path that lead to this entity being encoded.</param>
-        protected void EnqueueEntity( IEntity entity, EntityPath path )
+        public void EnqueueEntity( IEntity entity, EntityPath path )
         {
             List<KeyValuePair<string, IEntity>> entities;
 
@@ -678,7 +561,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
 
         /// <summary>
-        /// Generate the list of entities that refernce this parent entity. These are entities that
+        /// Generate the list of entities that reference this parent entity. These are entities that
         /// must be created after this entity has been created.
         /// </summary>
         /// <param name="parentEntity">The parent entity to find reverse-references to.</param>
@@ -850,23 +733,15 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 encodedEntity.Properties.Add( property.Name, property.GetValue( entity ) );
             }
 
-            GenerateReferences( entity, encodedEntity );
-
-            return encodedEntity;
-        }
-
-        /// <summary>
-        /// Generate any explicit references to other objects in a manner that we can use
-        /// to recreate those references after import.
-        /// </summary>
-        /// <param name="entity">The entity whose references need to be defined.</param>
-        /// <param name="exportData">The export data to defined the references in.</param>
-        protected void GenerateReferences( IEntity entity, EncodedEntity exportData )
-        {
+            //
+            // Generate the references to other entities.
+            //
             foreach ( var x in FindReferencedEntities( entity ) )
             {
-                exportData.MakeReference( x.Key, x.Value );
+                encodedEntity.MakeIntoReference( x.Key, x.Value );
             }
+
+            return encodedEntity;
         }
 
         /// <summary>
@@ -1039,89 +914,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                     property.SetValue( entity, ChangeType( property.PropertyType, value ) );
                 }
-                else
-                {
-                    //
-                    // Otherwise check if it is a reference property.
-                    //
-                    var reference = encodedEntity.References.Where( r => r.Property == property.Name ).FirstOrDefault();
-
-                    if ( reference != null )
-                    {
-                        object otherEntity = null;
-
-                        //
-                        // Find the referenced entity based on the reference type. This whole section should
-                        // probably be moved into a method of Reference.
-                        //
-                        if ( reference.Type == "Guid" )
-                        {
-                            otherEntity = GetExistingEntity( reference.EntityType, MapGuid( new Guid( ( string ) reference.Data ) ) );
-                        }
-                        else if ( reference.Type == "EntityType" )
-                        {
-                            otherEntity = new EntityTypeService( RockContext ).Queryable().Where( e => e.Name == ( string ) reference.Data ).FirstOrDefault();
-                        }
-                        else if ( reference.Type == "FieldType" )
-                        {
-                            otherEntity = new FieldTypeService( RockContext ).Queryable().Where( f => f.Class == ( string ) reference.Data ).FirstOrDefault();
-                        }
-                        else
-                        {
-                            throw new Exception( string.Format( "Don't know how to handle reference type {0}.", reference.Type ) );
-                        }
-
-                        //
-                        // If we found an entity then get its Id number and store that.
-                        //
-                        if ( otherEntity != null )
-                        {
-                            var idProperty = otherEntity.GetType().GetProperty( "Id" );
-
-                            if ( idProperty != null )
-                            {
-                                property.SetValue( entity, ChangeType( property.PropertyType, idProperty.GetValue( otherEntity ) ) );
-                            }
-                        }
-                    }
-                }
             }
-        }
 
-        /// <summary>
-        /// Convert the given object value to the target type. This extends
-        /// the IConvertable.ChangeType support since some things don't
-        /// implement IConvertable, like Guid and Nullable.
-        /// </summary>
-        /// <param name="t">The target data type to convert to.</param>
-        /// <param name="obj">The object value to be converted.</param>
-        /// <returns>The value converted to the target type.</returns>
-        public object ChangeType( Type t, object obj )
-        {
-            Type u = Nullable.GetUnderlyingType( t );
-
-            if ( u != null )
+            //
+            // Restore all references.
+            //
+            foreach ( var reference in encodedEntity.References )
             {
-                return ( obj == null ) ? null : ChangeType( u, obj );
-            }
-            else
-            {
-                if ( t.IsEnum )
-                {
-                    return Enum.Parse( t, obj.ToString() );
-                }
-                else if ( t == typeof( Guid ) && obj is string )
-                {
-                    return new Guid( ( string ) obj );
-                }
-                else if ( t == typeof( string ) && obj is Guid )
-                {
-                    return obj.ToString();
-                }
-                else
-                {
-                    return Convert.ChangeType( obj, t );
-                }
+                reference.Restore( entity, this );
             }
         }
 
@@ -1179,7 +979,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <param name="parent">The parent entity that we are currently considering.</param>
         /// <param name="entities">The full list of entities still available to pick from.</param>
         /// <returns>The tree from this parent entity on down.</returns>
-        protected List<EntityReferenceTree> GenerateTree( IEntity parent, Dictionary<IEntity, EntityPath> entities )
+        public List<EntityReferenceTree> GenerateTree( IEntity parent, Dictionary<IEntity, EntityPath> entities )
         {
             List<EntityReferenceTree> leafs = new List<EntityReferenceTree>();
 
@@ -1196,10 +996,193 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 leafs.Add( leaf );
             }
 
-            return leafs;
+            return leafs.OrderBy( l => l.PropertyName ).ToList();
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Describes a single element of an entity path.
+    /// </summary>
+    public class EntityPathComponent
+    {
+        /// <summary>
+        /// The entity at this specific location in the path.
+        /// </summary>
+        public IEntity Entity { get; private set; }
+
+        /// <summary>
+        /// The name of the property used to reach the next location in the path.
+        /// </summary>
+        public string PropertyName { get; private set; }
+
+        /// <summary>
+        /// Create a new entity path component.
+        /// </summary>
+        /// <param name="entity">The entity at this specific location in the path.</param>
+        /// <param name="propertyName">The name of the property used to reach the next location in the path.</param>
+        public EntityPathComponent( IEntity entity, string propertyName )
+        {
+            Entity = entity;
+            PropertyName = propertyName;
+        }
+    }
+
+    /// <summary>
+    /// Describes the entity and property path used to reach this point in
+    /// the entity tree.
+    /// </summary>
+    public class EntityPath : List<EntityPathComponent>
+    {
+        #region Instance Methods
+
+        /// <summary>
+        /// Create a duplicate copy of this entity path and return it.
+        /// </summary>
+        /// <returns>A duplicate of this entity path.</returns>
+        public EntityPath Clone()
+        {
+            EntityPath path = new EntityPath();
+
+            path.AddRange( this );
+
+            return path;
+        }
+
+        /// <summary>
+        /// Create a new EntityPath by appending the path component. The original
+        /// path is not modified.
+        /// </summary>
+        /// <param name="component">The new path component to append to this path.</param>
+        /// <returns></returns>
+        public EntityPath PathByAddingComponent( EntityPathComponent component )
+        {
+            EntityPath path = this.Clone();
+
+            path.Add( component );
+
+            return path;
+        }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Tracks entities and related information of entities that are queued up to be encoded.
+    /// </summary>
+    public class QueuedEntity
+    {
+        #region Properties
+
+        /// <summary>
+        /// The entity that is queued up for processing.
+        /// </summary>
+        public IEntity Entity { get; private set; }
+
+        /// <summary>
+        /// A list of all paths that we took to reach this entity.
+        /// </summary>
+        public List<EntityPath> ReferencePaths { get; private set; }
+
+        /// <summary>
+        /// During the encode process this will be filled in with the encoded
+        /// entity data so that we can keep a link between the IEntity and the
+        /// encoded data until we are done.
+        /// </summary>
+        public EncodedEntity EncodedEntity { get; set; }
+
+        #endregion
+
+        #region Instance Methods
+
+        /// <summary>
+        /// Initialize a new queued entity for the given access path.
+        /// </summary>
+        /// <param name="entity">The entity that is going to be placed in the queue.</param>
+        /// <param name="path">The initial path used to reach this entity.</param>
+        public QueuedEntity( IEntity entity, EntityPath path )
+        {
+            Entity = entity;
+            ReferencePaths = new List<EntityPath>();
+            ReferencePaths.Add( path );
+        }
+
+        /// <summary>
+        /// Add a new entity path reference to this existing entity.
+        /// </summary>
+        /// <param name="path">The path that can be used to reach this entity.</param>
+        public void AddReferencePath( EntityPath path )
+        {
+            ReferencePaths.Add( path );
+        }
+
+        /// <summary>
+        /// This is used for debug output to display the entity information and the path(s)
+        /// that we took to find it.
+        /// </summary>
+        /// <returns>A string that describes this queued entity.</returns>
+        public override string ToString()
+        {
+            StringBuilder sb = new StringBuilder();
+            EntityPath primaryPath = ReferencePaths[0];
+
+            sb.AppendFormat( "{0} {1}", Entity.TypeName, Entity.Guid );
+            foreach ( var p in ReferencePaths )
+            {
+                sb.AppendFormat( "\n\tPath" );
+                foreach ( var e in p )
+                {
+                    sb.AppendFormat( "\n\t\t{0} {2} {1}", e.Entity.TypeName, e.PropertyName, e.Entity.Guid );
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Checks if this entity can be reached by the property path. For example if exporting a
+        /// WorkflowType and you want to check if this entity is a WorkflowActionType for this
+        /// workflow then you would use the property path "ActivityTypes.ActionTypes".
+        /// </summary>
+        /// <param name="propertyPath">The period delimited list of properties to reach this entity.</param>
+        /// <returns>true if this entity can be reached by the property path, false if not.</returns>
+        public bool ContainsPropertyPath( string propertyPath )
+        {
+            var properties = propertyPath.Split( '.' );
+
+            foreach ( var path in ReferencePaths )
+            {
+                if ( path.Count == properties.Length )
+                {
+                    int i = 0;
+                    for ( i = 0; i < path.Count; i++ )
+                    {
+                        if ( path[i].PropertyName != properties[i] )
+                        {
+                            break;
+                        }
+                    }
+
+                    if ( i == path.Count )
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
+    }
+
+    public enum ReferenceType
+    {
+        Null = 0,
+        Guid = 1,
+        EntityType = 2,
+        FieldType = 3
     }
 
     /// <summary>
@@ -1209,7 +1192,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     /// contained the Id number. During an import operation that Property is filled in
     /// with the Id number of the object identified by the EntityType and the Guid.
     /// </summary>
-    class Reference
+    public class Reference
     {
         #region Properties
 
@@ -1217,22 +1200,22 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// The name of the property to be filled in with the Id number of the
         /// referenced entity.
         /// </summary>
-        public string Property { get; set; }
+        public string Property { get; private set; }
 
         /// <summary>
         /// The entity type name that will be loaded by it's Guid.
         /// </summary>
-        public string EntityType { get; set; }
+        public string EntityType { get; private set; }
 
         /// <summary>
         /// The type of reference this is.
         /// </summary>
-        public string Type { get; set; }
+        public ReferenceType Type { get; private set; }
 
         /// <summary>
         /// The data used to re-create the reference, depends on Type.
         /// </summary>
-        public object Data { get; set; }
+        public object Data { get; private set; }
 
         #endregion
 
@@ -1242,16 +1225,80 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// Creates a new entity reference object that is used to reconstruct the
         /// link between two entities in the database.
         /// </summary>
-        /// <param name="referenceType">The type of reference this is.</param>
-        /// <param name="property">The name of the property in the containing entity.</param>
-        /// <param name="entityType">The referenced entity type name.</param>
-        /// <param name="data">The data needed to locate the referenced entity.</param>
-        public Reference( string referenceType, string property, string entityType, object data )
+        /// <param name="entity">The entity we are creating a reference to.</param>
+        /// <param name="propertyName">The name of the property in the containing entity.</param>
+        public Reference( IEntity entity, string propertyName )
         {
-            Property = property;
-            EntityType = entityType;
-            Type = referenceType;
-            Data = data;
+            Type entityType = Helper.GetEntityType( entity );
+
+            EntityType = entityType.FullName;
+            Property = propertyName;
+
+            if ( entity is EntityType )
+            {
+                Type = ReferenceType.EntityType;
+                Data = ( ( EntityType ) entity ).Name;
+            }
+            else if ( entity is FieldType )
+            {
+                Type = ReferenceType.FieldType;
+                Data = ( ( FieldType ) entity ).Class;
+            }
+            else
+            {
+                Type = ReferenceType.Guid;
+                Data = entity.Guid;
+            }
+        }
+
+        /// <summary>
+        /// Restore this reference into the entity object.
+        /// </summary>
+        /// <param name="entity">The entity to restore the reference into.</param>
+        /// <param name="helper">The helper that provides us data access.</param>
+        public void Restore( IEntity entity, Helper helper )
+        {
+            PropertyInfo property = entity.GetType().GetProperty( Property );
+            object otherEntity = null;
+
+            if ( property == null || Type == ReferenceType.Null )
+            {
+                return;
+            }
+
+            //
+            // Find the referenced entity based on the reference type. This whole section should
+            // probably be moved into a method of Reference.
+            //
+            if ( Type == ReferenceType.Guid )
+            {
+                otherEntity = helper.GetExistingEntity( EntityType, helper.MapGuid( new Guid( ( string ) Data ) ) );
+            }
+            else if ( Type == ReferenceType.EntityType )
+            {
+                otherEntity = new EntityTypeService( helper.RockContext ).Queryable().Where( e => e.Name == ( string ) Data ).FirstOrDefault();
+            }
+            else if ( Type == ReferenceType.FieldType )
+            {
+                otherEntity = new FieldTypeService( helper.RockContext ).Queryable().Where( f => f.Class == ( string ) Data ).FirstOrDefault();
+            }
+            else
+            {
+                throw new Exception( string.Format( "Don't know how to handle reference type {0}.", Type ) );
+            }
+
+            //
+            // If we found an entity then get its Id number and store that.
+            //
+            if ( otherEntity != null )
+            {
+                var idProperty = otherEntity.GetType().GetProperty( "Id" );
+
+                if ( idProperty != null )
+                {
+                    property.SetValue( entity, Helper.ChangeType( property.PropertyType, idProperty.GetValue( otherEntity ) ) );
+                }
+            }
         }
 
         #endregion
@@ -1263,18 +1310,63 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     /// based on "Name" or "Value" property if one is available, otherwise "EntityType Guid"
     /// format.
     /// </summary>
-    class EntityReferenceTree
+    public class EntityReferenceTree
     {
         public IEntity Entity { get; set; }
         public string PropertyName { get; set; }
         public List<EntityReferenceTree> Children { get; set; }
+
+
+        /// <summary>
+        /// Cleans the entire reference tree. Any leaf that is an ignored entity type and
+        /// whose entire sub-tree is also of the ignored entity types is removed from the
+        /// tree.
+        /// </summary>
+        /// <param name="ignoredEntityTypes">The list of entity types to ignore from the list.</param>
+        public void CleanTree( List<string> ignoredEntityTypes )
+        {
+            foreach ( var c in Children.ToList() )
+            {
+                if ( c.TreeContainsOnlyTypes( ignoredEntityTypes ) )
+                {
+                    Children.Remove( c );
+                }
+                else
+                {
+                    c.CleanTree( ignoredEntityTypes );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determines if this tree only contains entities from the list of types.
+        /// </summary>
+        /// <param name="types">The list of entity types that should be considered.</param>
+        /// <returns>true if the tree, including this entity, contains only entities from the given list. Otherwise false.</returns>
+        protected bool TreeContainsOnlyTypes( List<string> types )
+        {
+            if ( !types.Contains( Helper.GetEntityType( Entity ).FullName ) )
+            {
+                return false;
+            }
+
+            foreach ( var c in Children )
+            {
+                if ( !c.TreeContainsOnlyTypes( types ) )
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 
     /// <summary>
     /// General container for exported entity data. This object should be encoded
     /// and decoded as JSON data.
     /// </summary>
-    class DataContainer
+    public class DataContainer
     {
         #region Properties
 
@@ -1309,7 +1401,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     /// Describes an Entity object in a portable manner that can be used
     /// to re-create the entity on another Rock installation.
     /// </summary>
-    class EncodedEntity
+    public class EncodedEntity
     {
         #region Properties
 
@@ -1364,23 +1456,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         /// <param name="originalProperty">The original property name that we are replacing.</param>
         /// <param name="entity">The entity that is being referenced.</param>
-        public void MakeReference( string originalProperty, IEntity entity )
+        public void MakeIntoReference( string originalProperty, IEntity entity )
         {
-            Reference reference;
-            Type entityType = Helper.GetEntityType( entity );
-
-            if ( entity is EntityType )
-            {
-                reference = new Reference( "EntityType", originalProperty, entityType.FullName, ( ( EntityType ) entity ).Name );
-            }
-            else if ( entity is FieldType )
-            {
-                reference = new Reference( "FieldType", originalProperty, entityType.FullName, ( ( FieldType ) entity ).Class );
-            }
-            else
-            {
-                reference = new Reference( "Guid", originalProperty, entityType.FullName, entity.Guid );
-            }
+            Reference reference = new Reference( entity, originalProperty );
 
             References.Add( reference );
             Properties.Remove( originalProperty );
@@ -1420,7 +1498,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     /// Interface for indicating that the inheriting class is a processor for
     /// export and import of entities from and to Rock.
     /// </summary>
-    interface IEntityProcessor
+    public interface IEntityProcessor
     {
         /// <summary>
         /// Evaluate the list of referenced entities. This is a list of key value pairs that identify
@@ -1487,7 +1565,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     /// custom processing capabilities.
     /// </summary>
     /// <typeparam name="T">The IEntity class type that this processor is for.</typeparam>
-    abstract class EntityProcessor<T> : IEntityProcessor where T : IEntity
+    public abstract class EntityProcessor<T> : IEntityProcessor where T : IEntity
     {
         public void EvaluateReferencedEntities( IEntity entity, List<KeyValuePair<string, IEntity>> references, Helper helper )
         {
@@ -1642,6 +1720,25 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
     class WorkflowActionFormProcessor : EntityProcessor<WorkflowActionForm>
     {
+        protected override void EvaluateReferencedEntities( WorkflowActionForm entity, List<KeyValuePair<string, IEntity>> references, Helper helper )
+        {
+            List<string> actions = entity.Actions.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries ).ToList();
+            for ( int i = 0; i < actions.Count; i++ )
+            {
+                var details = actions[i].Split( new char[] { '^' } );
+                if ( details.Length > 2 )
+                {
+                    Guid definedValueGuid = details[1].AsGuid();
+                    IEntity definedValue = helper.GetExistingEntity( "Rock.Model.DefinedValue", definedValueGuid );
+
+                    if ( definedValue != null )
+                    {
+                        references.Add( new KeyValuePair<string, IEntity>( "Actions", definedValue ) );
+                    }
+                }
+            }
+        }
+
         public override void PreProcessImportedEntity( WorkflowActionForm entity, EncodedEntity encodedEntity, object data, Helper helper )
         {
             //
