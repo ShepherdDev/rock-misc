@@ -9,6 +9,7 @@ using Rock.Data;
 using Rock.Model;
 using Rock.Security;
 using Rock.Web.UI;
+using Rock.Web.UI.Controls;
 
 namespace RockWeb.Plugins.com_shepherdchurch.Misc
 {
@@ -227,34 +228,16 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             return null;
         }
 
-        #endregion
-
-        #region Event Handlers
-
         /// <summary>
-        /// Handles the BlockUpdated event of the control.
+        /// Get the entity that we are going to be querying authorization records for.
         /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected void Block_BlockUpdated( object sender, EventArgs e )
-        {
-        }
-
-        /// <summary>
-        /// Handles the Click event of the control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected void btnCheck_Click( object sender, EventArgs e )
+        /// <returns>ISecured entity or null if not found.</returns>
+        ISecured GetEntity()
         {
             var entityId = tbEntityId.Text.AsInteger();
             var entityGuid = tbEntityId.Text.AsGuid();
             var entityType = new EntityTypeService( new RockContext() ).Get( pEntityType.SelectedEntityTypeId.Value );
             IEntity entity = null;
-            ISecured entitySecured = null;
-
-            pnlResult.Visible = false;
-            nbWarning.Text = string.Empty;
 
             //
             // Find the entity they are searching for or display an error if we couldn't parse the Id.
@@ -267,36 +250,22 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             {
                 entity = GetByGuid( entityType.Name, entityGuid );
             }
-            else
+
+            if ( entity == null || ( entity as ISecured ) == null )
             {
-                nbWarning.Text = "Could not parse the entity id.";
-                return;
+                return null;
             }
 
-            //
-            // If the entity was not found, display an error.
-            //
-            if ( entity == null )
-            {
-                nbWarning.Text = "Could not find the entity, maybe the wrong Id was specified.";
-                return;
-            }
+            return ( ISecured ) entity;
+        }
 
-            //
-            // Make sure this entity supports security.
-            //
-            entitySecured = entity as ISecured;
-            if ( entitySecured == null )
-            {
-                nbWarning.Text = "Entity type is not a securable item.";
-                return;
-            }
-
-            //
-            // Get the selected person or use the currently logged in person.
-            //
-            var person = ppPerson.PersonId.HasValue ? new PersonService( new RockContext() ).Get( ppPerson.PersonId.Value ) : CurrentPerson;
-
+        /// <summary>
+        /// Bind the grid to the authorization records found in the database.
+        /// </summary>
+        /// <param name="entitySecured">The securable entity to query authorization records of.</param>
+        /// <param name="person">The person whose access level we are checking.</param>
+        void BindGrid( ISecured entitySecured, Person person )
+        {
             //
             // Walk all the supported actions and build a row of results.
             //
@@ -319,16 +288,19 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         friendlyName = auth.Group.ToStringSafe();
 
                     var row = new AuthGridRow();
+                    row.Id = auth.Id;
                     row.Action = auth.Action;
                     if ( authEntity != null )
                     {
                         row.EntityType = authEntity.TypeName;
                         row.EntityId = authEntity.Id != 0 ? ( int? ) authEntity.Id : null;
                         row.EntityName = authEntity.Id != 0 ? authEntity.ToString() : "(Entity Administration Security)";
+                        row.IsUnlockable = !( auth.PersonAlias != null && auth.PersonAlias.PersonId == person.Id && auth.AllowOrDeny == "A" );
                     }
                     else
                     {
                         row.EntityId = null;
+                        row.IsUnlockable = true;
 
                         if ( authorative as GlobalDefault != null )
                         {
@@ -349,12 +321,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 else
                 {
                     var row = new AuthGridRow();
+                    row.Id = 0;
                     row.Action = action.Key;
                     row.EntityType = string.Empty;
                     row.EntityId = null;
                     row.EntityName = string.Empty;
                     row.Access = "<span class='label label-default'>Unknown</span>";
                     row.Role = "No explicit permissions found";
+                    row.IsUnlockable = false;
 
                     rows.Add( row );
                 }
@@ -362,8 +336,92 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             gResults.DataSource = rows;
             gResults.DataBind();
+        }
+
+        #endregion
+
+        #region Event Handlers
+
+        /// <summary>
+        /// Handles the BlockUpdated event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void Block_BlockUpdated( object sender, EventArgs e )
+        {
+        }
+
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void btnCheck_Click( object sender, EventArgs e )
+        {
+            ISecured entity = null;
+
+            pnlResult.Visible = false;
+            nbWarning.Text = string.Empty;
+
+            //
+            // Find the entity they are searching for or display an error if we couldn't parse the Id.
+            //
+            entity = GetEntity();
+
+            //
+            // If the entity was not found, display an error.
+            //
+            if ( entity == null )
+            {
+                nbWarning.Text = "Could not find the entity, maybe the wrong Id was specified.";
+                return;
+            }
+
+            //
+            // Get the selected person or use the currently logged in person.
+            //
+            var person = ppPerson.PersonId.HasValue ? new PersonService( new RockContext() ).Get( ppPerson.PersonId.Value ) : CurrentPerson;
+
+            BindGrid( entity, person );
 
             pnlResult.Visible = true;
+        }
+
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void gUnlock_Click( object sender, EventArgs e )
+        {
+            RowEventArgs args = ( RowEventArgs ) e;
+
+            var auth = new AuthService( new RockContext() ).Get( args.RowKeyId );
+            if ( auth != null && auth.Id != 0 )
+            {
+                var person = ppPerson.PersonId.HasValue ? new PersonService( new RockContext() ).Get( ppPerson.PersonId.Value ) : CurrentPerson;
+                IEntity entity = GetEntity();
+
+                Authorization.AllowPerson( ( ISecured ) entity, auth.Action, person );
+
+                BindGrid( ( ISecured ) entity, person );
+            }
+        }
+
+        /// <summary>
+        /// Handles the RowDataBound event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="GridViewRowEventArgs"/> instance containing the event data.</param>
+        protected void gResults_RowDataBound( object sender, GridViewRowEventArgs e )
+        {
+            if ( e.Row.RowType == DataControlRowType.DataRow )
+            {
+                AuthGridRow row = ( AuthGridRow ) e.Row.DataItem;
+                LinkButton lbUnlock = ( LinkButton ) e.Row.Cells[6].Controls[0];
+
+                lbUnlock.Visible = row.IsUnlockable;
+            }
         }
 
         #endregion
@@ -373,6 +431,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         class AuthGridRow
         {
+            public int Id { get; set; }
+
             public string Action { get; set; }
 
             public string EntityType { get; set; }
@@ -384,6 +444,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             public string Access { get; set; }
 
             public string Role { get; set; }
+
+            public bool IsUnlockable { get; set; }
         }
     }
 }
