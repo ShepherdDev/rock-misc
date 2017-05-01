@@ -400,9 +400,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             if ( auth != null && auth.Id != 0 )
             {
                 var person = ppPerson.PersonId.HasValue ? new PersonService( new RockContext() ).Get( ppPerson.PersonId.Value ) : CurrentPerson;
-                IEntity entity = GetEntity();
+                ISecured entity = GetEntity();
 
-                Authorization.AllowPerson( ( ISecured ) entity, auth.Action, person );
+                Authorization.AllowPerson( entity, auth.Action, person );
 
                 BindGrid( ( ISecured ) entity, person );
             }
