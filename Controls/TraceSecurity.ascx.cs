@@ -295,12 +295,10 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         row.EntityType = authEntity.TypeName;
                         row.EntityId = authEntity.Id != 0 ? ( int? ) authEntity.Id : null;
                         row.EntityName = authEntity.Id != 0 ? authEntity.ToString() : "(Entity Administration Security)";
-                        row.IsUnlockable = !( auth.PersonAlias != null && auth.PersonAlias.PersonId == person.Id && auth.AllowOrDeny == "A" );
                     }
                     else
                     {
                         row.EntityId = null;
-                        row.IsUnlockable = true;
 
                         if ( authorative as GlobalDefault != null )
                         {
@@ -315,6 +313,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     }
                     row.Access = auth.AllowOrDeny == "A" ? "<span class='label label-success'>Allow</span>" : "<span class='label label-danger'>Deny</span>";
                     row.Role = friendlyName;
+                    row.IsUnlockable = auth.AllowOrDeny != "A";
 
                     rows.Add( row );
                 }
@@ -399,12 +398,28 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             var auth = new AuthService( new RockContext() ).Get( args.RowKeyId );
             if ( auth != null && auth.Id != 0 )
             {
+                var rockContext = new RockContext();
                 var person = ppPerson.PersonId.HasValue ? new PersonService( new RockContext() ).Get( ppPerson.PersonId.Value ) : CurrentPerson;
                 ISecured entity = GetEntity();
 
-                Authorization.AllowPerson( entity, auth.Action, person );
+                var explicitAuth = new AuthService( rockContext ).Queryable()
+                    .Where( a => a.EntityTypeId == auth.EntityTypeId && a.EntityId == auth.EntityId && a.Action == auth.Action )
+                    .Where( a => a.PersonAlias.PersonId == person.Id )
+                    .FirstOrDefault();
 
-                BindGrid( ( ISecured ) entity, person );
+                if ( explicitAuth != null )
+                {
+                    explicitAuth.AllowOrDeny = "A";
+                    rockContext.SaveChanges();
+
+                    Authorization.ReloadAction( entity.TypeId, entity.Id, auth.Action );
+                }
+                else
+                {
+                    Authorization.AllowPerson( entity, auth.Action, person );
+                }
+
+                BindGrid( entity, person );
             }
         }
 
