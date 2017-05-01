@@ -81,6 +81,12 @@
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="README.md" />
+    <None Include="SQL\Test Communication Template\1.0\uninstall\deletefile.lst" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <None Include="SQL\Test Communication Template\1.0\install\run.sql" />
+    <None Include="SQL\Test Communication Template\1.0\uninstall\run.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
