@@ -35,6 +35,9 @@ namespace Plugins.com_shepherdchurch.Misc
         "The type of address to be displayed / edited.", false, "", "Allow Edits To", order: 6 )]
     public partial class GroupMemberProfileDetails : RockBlock
     {
+        /// <summary>
+        /// The person that is being edited.
+        /// </summary>
         protected int TargetPersonId
         {
             set { ViewState["TargetPersonId"] = value; }
