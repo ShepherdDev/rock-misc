@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Web.UI;
 using System.Web.UI.WebControls;
 
 using Rock;
@@ -43,6 +44,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <param name="e">Arguments that describe this event.</param>
         protected void Page_Load( object sender, EventArgs e )
         {
+            nbCacheCleared.Visible = false;
+            nbPoppedLock.Text = string.Empty;
+
             if ( !IsPostBack )
             {
                 var rockContext = new RockContext();
@@ -391,6 +395,25 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void btnClearCache_Click( object sender, EventArgs e )
+        {
+            Authorization.Flush();
+            nbCacheCleared.Visible = true;
+
+            if ( pnlResult.Visible )
+            {
+                var entity = GetEntity();
+                var person = ppPerson.PersonId.HasValue ? new PersonService( new RockContext() ).Get( ppPerson.PersonId.Value ) : CurrentPerson;
+
+                BindGrid( entity, person );
+            }
+        }
+
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void gUnlock_Click( object sender, EventArgs e )
         {
             RowEventArgs args = ( RowEventArgs ) e;
@@ -418,6 +441,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 {
                     Authorization.AllowPerson( entity, auth.Action, person );
                 }
+
+                nbPoppedLock.Text = string.Format( "An explicit Allow rule has been added for {0}", person.FullName );
 
                 BindGrid( entity, person );
             }
