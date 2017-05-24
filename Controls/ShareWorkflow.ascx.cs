@@ -26,6 +26,25 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
     public partial class ShareWorkflow : RockBlock
     {
+        protected List<Export.EntityPreview> PreviewEntities
+        {
+            get
+            {
+                if ( _previewEntities == null && ViewState["PreviewEntities"] != null )
+                {
+                    _previewEntities = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Export.EntityPreview>>( ViewState["PreviewEntities"].ToString() );
+                }
+
+                return _previewEntities;
+            }
+            set
+            {
+                ViewState["PreviewEntities"] = Newtonsoft.Json.JsonConvert.SerializeObject( value );
+                _previewEntities = value;
+            }
+        }
+        private List<Export.EntityPreview> _previewEntities;
+
         #region Base Method Overrides
 
         /// <summary>
@@ -82,6 +101,13 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             var workflowType = workflowTypeService.Get( wtpExport.SelectedValueAsId().Value );
             var helper = new Export.Helper( new RockContext() );
             var exporter = new Export.WorkflowTypeExporter( helper );
+
+            var entities = exporter.Preview2( workflowType );
+            PreviewEntities = entities.
+                Where( entity => !new string[] { "Rock.Model.Attribute", "Rock.Model.AttributeValue", "Rock.Model.AttributeQualifier", "Rock.Model.WorkflowActionFormAttribute" }.Contains( entity.Type ) )
+                .ToList();
+            BindPreviewGrid();
+            return;
 
             var tree = exporter.Preview( workflowType );
 
@@ -159,6 +185,90 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 fuImport.BinaryFileId = null;
             }
         }
+
+        protected void gPreview_RowDataBound( object sender, GridViewRowEventArgs e )
+        {
+            var ddlAction = e.Row.FindControl( "ddlAction" ) as Rock.Web.UI.Controls.RockDropDownList;
+            var item = ( Export.EntityPreview ) e.Row.DataItem;
+
+            if ( ddlAction != null )
+            {
+                if ( item.Paths.Count == 1 && item.Paths.First().Paths.Count == 0 )
+                {
+                    ddlAction.Enabled = false;
+                }
+                ddlAction.SelectedValue = item.Action.ToString();
+            }
+        }
+
+        protected void gPreview_GridRebind( object sender, Rock.Web.UI.Controls.GridRebindEventArgs e )
+        {
+            BindPreviewGrid();
+        }
+
+        protected void BindPreviewGrid()
+        {
+            var query = PreviewEntities.AsQueryable();
+
+            if ( gPreview.SortProperty != null )
+            {
+                query = query.Sort( gPreview.SortProperty );
+            }
+            gPreview.DataSource = query;
+            gPreview.DataBind();
+        }
+
+        protected void btnStage2_Click( object sender, EventArgs e )
+        {
+            var previewEntities = PreviewEntities;
+
+            for (int i = 0; i < gPreview.Rows.Count; i++ )
+            {
+                var ddlAction = ( Rock.Web.UI.Controls.RockDropDownList ) gPreview.Rows[i].FindControl( "ddlAction" );
+
+                previewEntities[i].Action = ddlAction.SelectedValue.AsInteger();
+            }
+        }
+
+        protected void lbTree_Click( object sender, Rock.Web.UI.Controls.RowEventArgs e )
+        {
+            var entity = PreviewEntities.Where( p => p.Guid == ( Guid ) e.RowKeyValue ).First();
+            string ulli = "<ul class=\"fa-ul\"><li><i class=\"fa-li fa fa-angle-double-right\"></i>";
+
+            StringBuilder content = new StringBuilder();
+            foreach ( var reference in entity.Paths )
+            {
+                if ( reference.Paths.Count == 0 )
+                {
+                    content.Append( "This is a root object so there is no reference tree." );
+                }
+                else
+                {
+                    for ( int i = 0; i <= reference.Paths.Count; i++ )
+                    {
+                        if ( i == 0 )
+                        {
+                            content.AppendFormat( "{0}{1}", ulli, reference.Paths[i].Name );
+                        }
+                        else if ( i == reference.Paths.Count )
+                        {
+                            content.AppendFormat( "{0}{1}: <b>{{this object}}</b>", ulli, reference.Paths[i - 1].PropertyName );
+                        }
+                        else
+                        {
+                            content.AppendFormat( "{0}{1}: {2}", ulli, reference.Paths[i - 1].PropertyName, reference.Paths[i].Name );
+                        }
+                    }
+                    for ( int i = 0; i <= reference.Paths.Count; i++ )
+                    {
+                        content.AppendFormat( "</li></ul>" );
+                    }
+                }
+            }
+            ltModalTree.Text = content.ToString();
+
+            mdTree.Show();
+        }
     }
 }
 
@@ -175,7 +285,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
 
         public bool PathNeedsNewGuid( EntityPath path )
         {
-            return ( path == "AttributeTypes" ||
+            return ( path.Count == 0 ||
+                path == "AttributeTypes" ||
                 path == "AttributeTypes.AttributeQualifiers" ||
                 path == "ActivityTypes" ||
                 path == "ActivityTypes.AttributeTypes" ||
@@ -232,10 +343,27 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             ignoredEntityTypes.Add( "Rock.Model.AttributeValue" );
             ignoredEntityTypes.Add( "Rock.Model.AttributeQualifier" );
             ignoredEntityTypes.Add( "Rock.Model.WorkflowActionFormAttribute" );
-            ignoredEntityTypes.Add( "Rock.Model.SystemEmail" );
             root.CleanTree( ignoredEntityTypes );
 
             return root;
+        }
+
+        /// <summary>
+        /// Generate a tree of all entities that can be exported from the parent entity.
+        /// This can be used to present to the user and ask them if there are any entities
+        /// they do not wish to export.
+        /// </summary>
+        /// <param name="entity">The root entity that is going to be exported.</param>
+        /// <returns>An object that represents the entity tree.</returns>
+        public List<EntityPreview> Preview2( WorkflowType entity )
+        {
+            Helper helper = new Helper( new RockContext() );
+            List<EntityPreview> previewEntities = new List<EntityPreview>();
+
+            helper.EnqueueEntity( entity, new EntityPath(), true, this );
+            helper.Entities.ForEach( qe => previewEntities.Add( new EntityPreview( qe ) ) );
+
+            return previewEntities;
         }
     }
 
@@ -1063,6 +1191,80 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         #endregion
     }
 
+    public class EntityPathPreview
+    {
+        public class Component
+        {
+            public Guid Guid { get; set; }
+            public string Name { get; set; }
+            public string PropertyName { get; set; }
+        }
+
+        public List<Component> Paths { get; set; }
+
+        public EntityPathPreview()
+        {
+            Paths = new List<Component>();
+        }
+
+        public EntityPathPreview( EntityPath path )
+        {
+            Paths = new List<Component>();
+
+            foreach ( var c in path )
+            {
+                Paths.Add( new Component { Guid = c.Entity.Guid, Name = Helper.EntityFriendlyName( c.Entity, true ), PropertyName = c.PropertyName } );
+            }
+        }
+    }
+
+    public class EntityPreview
+    {
+        public Guid Guid { get; set; }
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public string ShortType { get; set; }
+        public List<EntityPathPreview> Paths { get; set; }
+        public bool IsCritical { get; set; }
+        public bool IsNewGuid { get; set; }
+        public int Action { get; set; }
+
+        [Newtonsoft.Json.JsonIgnore]
+        public List<KeyValuePair<string, string>> Parents
+        {
+            get
+            {
+                return Paths.Where( r => r.Paths.Any() )
+                    .Select( r => r.Paths.Last() )
+                    .Select( p => new KeyValuePair<string, string>( p.Name, p.PropertyName ) )
+                    .ToList();
+            }
+        }
+
+        public EntityPreview()
+        {
+            Paths = new List<EntityPathPreview>();
+        }
+
+        public EntityPreview(QueuedEntity queuedEntity)
+        {
+            Guid = queuedEntity.Entity.Guid;
+            Name = Helper.EntityFriendlyName( queuedEntity.Entity, false );
+            Type = Helper.GetEntityType( queuedEntity.Entity ).FullName;
+            ShortType = Helper.GetEntityType( queuedEntity.Entity ).Name;
+            IsCritical = queuedEntity.Flags.HasFlag( QueuedEntityFlags.Critical );
+            IsNewGuid = queuedEntity.Flags.HasFlag( QueuedEntityFlags.NewGuid );
+            Action = IsCritical ? 1 : 2;
+
+            Paths = new List<EntityPathPreview>();
+            foreach ( var path in queuedEntity.ReferencePaths )
+            {
+                Paths.Add( new EntityPathPreview( path ) );
+            }
+        }
+    }
+
+
     /// <summary>
     /// Describes a single element of an entity path.
     /// </summary>
@@ -1296,26 +1498,33 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         /// The name of the property to be filled in with the Id number of the
         /// referenced entity.
         /// </summary>
-        public string Property { get; private set; }
+        public string Property { get; set; }
 
         /// <summary>
         /// The entity type name that will be loaded by it's Guid.
         /// </summary>
-        public string EntityType { get; private set; }
+        public string EntityType { get; set; }
 
         /// <summary>
         /// The type of reference this is.
         /// </summary>
-        public ReferenceType Type { get; private set; }
+        public ReferenceType Type { get; set; }
 
         /// <summary>
         /// The data used to re-create the reference, depends on Type.
         /// </summary>
-        public object Data { get; private set; }
+        public object Data { get; set; }
 
         #endregion
 
         #region Instance Methods
+
+        /// <summary>
+        /// Create a new empty reference. This should only be used by Newtonsoft when deserializing.
+        /// </summary>
+        public Reference()
+        {
+        }
 
         /// <summary>
         /// Creates a new entity reference object that is used to reconstruct the
