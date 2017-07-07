@@ -1,0 +1,32 @@
+﻿.js-dashboard-column {
+    padding: 4px;
+    min-height: 40px;
+    border: 3px dashed transparent;
+}
+
+.dashboard-drop-zone {
+    border: 3px dashed gray;
+    border-radius: 6px;
+}
+
+/* Makes blocks that contain panels look nicer. */
+.dashboard-panel-widget > .panel > .panel-heading {
+    border-bottom: 0px;
+}
+.dashboard-panel-widget > .panel > .panel-body {
+    padding: 0px;
+}
+.dashboard-panel-widget > .panel > .panel-body > .block-content > div > .panel:last-of-type,
+.dashboard-panel-widget > .panel > .panel-body > .block-content > div > div > .grid {
+    margin-bottom: 0px;
+}
+
+/* Hides the first panel title of an embedded dashboard block. */
+.dashboard-hide-panel-title > .panel > .panel-body > .block-content > div > .panel:first-of-type > .panel-heading {
+    padding-top: 0px;
+    padding-bottom: 0px;
+    border-bottom: 0px;
+}
+.dashboard-hide-panel-title > .panel > .panel-body > .block-content > div > .panel:first-of-type > .panel-heading .panel-title {
+    display: none;
+}
