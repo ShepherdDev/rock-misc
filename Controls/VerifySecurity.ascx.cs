@@ -14,11 +14,11 @@ using Rock.Web.UI.Controls;
 
 namespace RockWeb.Plugins.com_shepherdchurch.Misc
 {
-    [DisplayName( "Trace Security" )]
+    [DisplayName( "Verify Security" )]
     [Category( "Shepherd Church > Misc" )]
-    [Description( "Trace the security of an entity and how it applies to a specified user." )]
+    [Description( "Verify the security of an entity and how it applies to a specified user." )]
 
-    public partial class TraceSecurity : RockBlock
+    public partial class VerifySecurity : RockBlock
     {
         #region Base Method Overrides
 

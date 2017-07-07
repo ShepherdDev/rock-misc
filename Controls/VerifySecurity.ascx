@@ -1,4 +1,4 @@
-﻿<%@ Control Language="C#" AutoEventWireup="true" CodeFile="TraceSecurity.ascx.cs" Inherits="RockWeb.Plugins.com_shepherdchurch.Misc.TraceSecurity" %>
+﻿<%@ Control Language="C#" AutoEventWireup="true" CodeFile="VerifySecurity.ascx.cs" Inherits="RockWeb.Plugins.com_shepherdchurch.Misc.VerifySecurity" %>
 
 <asp:UpdatePanel ID="upnlContent" runat="server">
     <ContentTemplate>
