@@ -925,6 +925,19 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             }
 
             //
+            // Run any post-process transforms.
+            //
+            foreach ( var processor in FindEntityProcessors( entityType ) )
+            {
+                var data = processor.PostProcessExportedEntity( entity, encodedEntity, this );
+
+                if ( data != null )
+                {
+                    encodedEntity.AddTransform( processor.Identifier.ToString(), data );
+                }
+            }
+
+            //
             // Generate the references to other entities.
             //
             foreach ( var x in FindReferencedEntities( entity ) )
@@ -1008,7 +1021,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
                     //
                     foreach ( var processor in FindEntityProcessors( entityType ) )
                     {
-                        processor.PreProcessImportedEntity( entity, encodedEntity, encodedEntity.GetTransform( processor.GetType().FullName ), this );
+                        processor.PreProcessImportedEntity( entity, encodedEntity, encodedEntity.GetTransform( processor.Identifier.ToString() ), this );
                     }
 
                     //
@@ -1827,7 +1840,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         {
             if ( Transforms.ContainsKey( name ) )
             {
-                return ( IDictionary<string, object> ) Transforms[name];
+                return Transforms[name];
             }
 
             return null;
@@ -1854,6 +1867,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
     /// </summary>
     public interface IEntityProcessor
     {
+        /// <summary>
+        /// The unique identifier for this entity processor. This is used to identify the correct
+        /// processor to use when importing so we match the one used during export.
+        /// </summary>
+        Guid Identifier { get; }
+
         /// <summary>
         /// Evaluate the list of referenced entities. This is a list of key value pairs that identify
         /// the property that the reference came from as well as the referenced entity itself. Implementations
@@ -1921,6 +1940,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
     /// <typeparam name="T">The IEntity class type that this processor is for.</typeparam>
     public abstract class EntityProcessor<T> : IEntityProcessor where T : IEntity
     {
+        abstract public Guid Identifier { get; }
+
         public void EvaluateReferencedEntities( IEntity entity, List<KeyValuePair<string, IEntity>> references, Helper helper )
         {
             EvaluateReferencedEntities( ( T ) entity, references, helper );
@@ -1978,6 +1999,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
 {
     class WorkflowTypeProcessor : EntityProcessor<WorkflowType>
     {
+        public override Guid Identifier { get { return new Guid( "d924193f-bd22-4dd7-b203-4399673dcd32" ); } }
+
         protected override void EvaluateChildEntities( WorkflowType entity, List<KeyValuePair<string, IEntity>> children, Helper helper )
         {
             var attributeService = new AttributeService( helper.RockContext );
@@ -2001,6 +2024,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
 
     class WorkflowActivityTypeProcessor : EntityProcessor<WorkflowActivityType>
     {
+        public override Guid Identifier { get { return new Guid( "e67efa08-fd93-4278-83db-55397f8dc9f0" ); } }
+
         protected override void EvaluateChildEntities( WorkflowActivityType entity, List<KeyValuePair<string, IEntity>> children, Helper helper )
         {
             var attributeService = new AttributeService( helper.RockContext );
@@ -2024,6 +2049,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
 
     class AttributeProcessor : EntityProcessor<Rock.Model.Attribute>
     {
+        public override Guid Identifier { get { return new Guid( "67c72560-e047-495a-ad75-09ed920dae8a" ); } }
+
         protected override void EvaluateReferencedEntities( Rock.Model.Attribute entity, List<KeyValuePair<string, IEntity>> references, Helper helper )
         {
             int entityId;
@@ -2058,6 +2085,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
 
     class AttributeValueProcessor : EntityProcessor<AttributeValue>
     {
+        public override Guid Identifier { get { return new Guid( "0c733598-46b1-4f59-854d-c5477dcfea17" ); } }
+
         protected override void EvaluateReferencedEntities( AttributeValue entity, List<KeyValuePair<string, IEntity>> references, Helper helper )
         {
             if ( entity.EntityId.HasValue && entity.Attribute != null )
@@ -2077,6 +2106,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
 
     class WorkflowActionFormProcessor : EntityProcessor<WorkflowActionForm>
     {
+        public override Guid Identifier { get { return new Guid( "5df81bd2-6d4e-438e-98a8-6e756b738264" ); } }
+
         protected override void EvaluateReferencedEntities( WorkflowActionForm entity, List<KeyValuePair<string, IEntity>> references, Helper helper )
         {
             List<string> actions = entity.Actions.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries ).ToList();
@@ -2096,28 +2127,39 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
             }
         }
 
+        protected override object PostProcessExportedEntity( WorkflowActionForm entity, EncodedEntity encodedEntity, Helper helper )
+        {
+            return entity.Actions;
+        }
+
         public override void PreProcessImportedEntity( WorkflowActionForm entity, EncodedEntity encodedEntity, object data, Helper helper )
         {
-            //
-            // Update the Guids in all the action buttons.
-            //
-            List<string> actions = entity.Actions.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries ).ToList();
-            for ( int i = 0; i < actions.Count; i++ )
+            if ( data != null && data is string )
             {
-                var details = actions[i].Split( new char[] { '^' } );
-                if ( details.Length > 2 )
+                //
+                // Update the Guids in all the action buttons.
+                //
+                List<string> actions = ( ( string ) data ).Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries ).ToList();
+                for ( int i = 0; i < actions.Count; i++ )
                 {
-                    Guid definedValueGuid = details[1].AsGuid();
-                    Guid activityTypeGuid = details[2].AsGuid();
+                    var details = actions[i].Split( new char[] { '^' } );
+                    if ( details.Length > 2 )
+                    {
+                        Guid definedValueGuid = details[1].AsGuid();
+                        Guid? activityTypeGuid = details[2].AsGuidOrNull();
 
-                    details[1] = helper.MapGuid( definedValueGuid ).ToString();
-                    details[2] = helper.MapGuid( activityTypeGuid ).ToString();
+                        details[1] = helper.MapGuid( definedValueGuid ).ToString();
+                        if ( activityTypeGuid.HasValue )
+                        {
+                            details[2] = helper.MapGuid( activityTypeGuid.Value ).ToString();
+                        }
 
-                    actions[i] = string.Join( "^", details );
+                        actions[i] = string.Join( "^", details );
+                    }
                 }
-            }
 
-            entity.Actions = string.Join( "|", actions );
+                entity.Actions = string.Join( "|", actions );
+            }
         }
     }
 }
