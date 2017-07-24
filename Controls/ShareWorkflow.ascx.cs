@@ -1053,6 +1053,39 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
 
                         if ( existingEntity != null )
                         {
+                            if ( entity.Guid != encodedEntity.Guid )
+                            {
+                                throw new Exception( "Attribute marked for new Guid but conflicting value already exists." );
+                            }
+
+                            GuidMap.AddOrReplace( encodedEntity.Guid, existingEntity.Guid );
+
+                            return existingEntity;
+                        }
+                    }
+
+                    //
+                    // Special handling of AttributeValue's. The guid's might be different but if the attribute Id
+                    // and entity Id are the same, assume it's the same.
+                    //
+                    else if ( encodedEntity.EntityType == "Rock.Model.AttributeValue" )
+                    {
+                        var attributeReference = encodedEntity.References.Where( r => r.Property == "AttributeId" ).First();
+                        var attribute = GetExistingEntity( "Rock.Model.Attribute", MapGuid( new Guid( ( string ) attributeReference.Data ) ) );
+                        var entityReference = encodedEntity.References.Where( r => r.Property == "EntityId" ).First();
+                        var entityRef = GetExistingEntity( entityReference.EntityType, MapGuid( new Guid( ( string ) entityReference.Data ) ) );
+
+                        var existingEntity = new AttributeValueService( RockContext )
+                            .Queryable().Where( a => a.AttributeId == attribute.Id && a.EntityId == entityRef.Id )
+                            .FirstOrDefault();
+
+                        if ( existingEntity != null )
+                        {
+                            if ( entity.Guid != encodedEntity.Guid )
+                            {
+                                throw new Exception( "AttributeValue marked for new Guid but conflicting value already exists." );
+                            }
+
                             GuidMap.AddOrReplace( encodedEntity.Guid, existingEntity.Guid );
 
                             return existingEntity;
