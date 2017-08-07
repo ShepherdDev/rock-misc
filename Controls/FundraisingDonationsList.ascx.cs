@@ -149,6 +149,7 @@ namespace Plugins.com_shepherdchurch.Misc
             }
 
             gDonations.ObjectList = donations.Select( d => d.Donor )
+                .DistinctBy( p => p.Id )
                 .Cast<object>()
                 .ToDictionary( p => ( ( Person ) p ).Id.ToString() );
 
