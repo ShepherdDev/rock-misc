@@ -18,7 +18,7 @@
                             <Rock:RockTemplateField  HeaderText="Participant" SortExpression="Participant.Person.LastName, Participant.Person.NickName">
                                 <ItemTemplate>
                                     <a href="/GroupMember/<%# Eval( "Participant.Id" ) %>"><%# Eval( "Participant.Person.FullName" ) %></a>
-                                    <a href="/Person/<%# Eval( "Participant.Person.Id" ) %>" class="margin-l-sm btn btn-sm btn-default"><i class="fa fa-user"></i></a>
+                                    <a href="/Person/<%# Eval( "Participant.Person.Id" ) %>" class="pull-right btn btn-sm btn-default"><i class="fa fa-user"></i></a>
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
                             <Rock:DateField DataField="Date" HeaderText="Date" HeaderStyle-HorizontalAlign="Right" SortExpression="Date" />
