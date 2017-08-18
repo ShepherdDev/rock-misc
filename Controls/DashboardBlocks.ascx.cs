@@ -35,6 +35,19 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         private const string ONE_TWO_COLUMN = "1-2-col";
         private const string TWO_ONE_COLUMN = "2-1-col";
 
+        private List<string> OptionsLayouts
+        {
+            get
+            {
+                return ViewState["OptionsLayouts"] as List<string>;
+            }
+            set
+            {
+                ViewState["OptionsLayouts"] = value;
+            }
+        }
+        private bool OptionsCanDeleteLayout;
+
         /// <summary>
         /// The list of available blocks as they are being edited in the settings modal.
         /// </summary>
@@ -69,7 +82,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             //
             // Setup any parts of the UI that need to be configured at page initialization.
             //
-            SetupLayoutButtons();
+            SetupLayoutButtonList( rblSettingsDefaultLayout );
             gSettingsBlocks.ShowActionRow = false;
             gSettingsBlocks.AllowPaging = false;
 
@@ -182,8 +195,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         foreach ( var cmd in cmds )
                         {
                             var values = cmd.Split( '_' );
-                            var column = values[0].AsInteger();
-                            var bids = values[1].SplitDelimitedValues();
+                            var row = values[0].AsInteger();
+                            var column = values[1].AsInteger();
+                            var bids = values[2].SplitDelimitedValues();
                             int order = 0;
 
                             foreach ( var bid in bids )
@@ -192,7 +206,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                                 if ( blockConfig != null )
                                 {
-                                    blockConfig.Column = column - 1;
+                                    blockConfig.Row = row;
+                                    blockConfig.Column = column;
                                     blockConfig.Order = order++;
                                 }
                             }
@@ -213,21 +228,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// Setup all the Radio buttons for the layout controls. These are non-standard images so things
         /// get a little funky if we try to do it in the .ascx file.
         /// </summary>
-        private void SetupLayoutButtons()
+        private void SetupLayoutButtonList(RadioButtonList rbl)
         {
-            rblOptionsLayout.Items.Clear();
-            rblOptionsLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/2-col.png" ) ), TWO_COLUMN ) );
-            rblOptionsLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/3-col.png" ) ), THREE_COLUMN ) );
-            rblOptionsLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/4-col.png" ) ), FOUR_COLUMN ) );
-            rblOptionsLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/1-2-col.png" ) ), ONE_TWO_COLUMN ) );
-            rblOptionsLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/2-1-col.png" ) ), TWO_ONE_COLUMN ) );
-
-            rblSettingsDefaultLayout.Items.Clear();
-            rblSettingsDefaultLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/2-col.png" ) ), TWO_COLUMN ) );
-            rblSettingsDefaultLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/3-col.png" ) ), THREE_COLUMN ) );
-            rblSettingsDefaultLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/4-col.png" ) ), FOUR_COLUMN ) );
-            rblSettingsDefaultLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/1-2-col.png" ) ), ONE_TWO_COLUMN ) );
-            rblSettingsDefaultLayout.Items.Add( new ListItem( string.Format( "<img src='{0}' />", ResolveRockUrl( "~/Plugins/com_shepherdchurch/Misc/Images/2-1-col.png" ) ), TWO_ONE_COLUMN ) );
+            rbl.Items.Clear();
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 50%'><div></div></div><div style='width: 50%'><div></div></div></div>", TWO_COLUMN ) );
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 33%'><div></div></div><div style='width: 33%'><div></div></div><div style='width: 33%'><div></div></div></div>", THREE_COLUMN ) );
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div></div>", FOUR_COLUMN ) );
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 50%'><div></div></div><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div></div>", ONE_TWO_COLUMN ) );
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div><div style='width: 50%'><div></div></div></div>", TWO_ONE_COLUMN ) );
         }
 
         /// <summary>
@@ -241,7 +249,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             var column = $(this).data('column');
             $(this).sortable( {{
                 connectWith: ['#{0} .js-dashboard-column:not([data-column=' + column + '])'],
-                handle: '.fa-bars',
+                handle: '.js-fa-bars',
                 activate: function (event, ui) {{
                     $(this).addClass('dashboard-drop-zone');
                 }},
@@ -306,56 +314,76 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
 
         /// <summary>
+        /// Build the rows that will be available for use based on the user's preferences.
+        /// </summary>
+        /// <param name="config">The user configuration to use.</param>
+        private List<DashboardRow> BuildRows( DashboardConfig config )
+        {
+            List<DashboardRow> rows = new List<DashboardRow>();
+            int row = 0;
+
+            foreach ( var layout in config.Layouts )
+            {
+                Panel pnlRow = new Panel { CssClass = "row" };
+
+                phControls.Controls.Add( pnlRow );
+                rows.Add( BuildColumns( layout, pnlRow, row++ ) );
+            }
+
+            return rows;
+        }
+
+        /// <summary>
         /// Build the columns that will be available for use based on the user's preferences.
         /// </summary>
-        /// <param name="config">The user configuration data to use.</param>
+        /// <param name="layout">The layout to use fo rthis row.</param>
         /// <param name="pnlRow">The panel control that will contain the columns.</param>
-        private List<DashboardColumn> BuildColumns( DashboardConfig config, Panel pnlRow )
+        private DashboardRow BuildColumns( string layout, Panel pnlRow, int row )
         {
-            List<DashboardColumn> columns = new List<DashboardColumn>();
+            DashboardRow columns = new DashboardRow();
             DashboardColumn column;
 
-            if ( config.Layout == TWO_COLUMN )
+            if ( layout == TWO_COLUMN )
             {
                 for ( int i = 0; i < 2; i++ )
                 {
-                    column = new DashboardColumn( "col-md-6", i );
+                    column = new DashboardColumn( "col-md-6", string.Format( "{0}_{1}", row, i ) );
                     pnlRow.Controls.Add( column.Panel );
                     columns.Add( column );
                 }
             }
-            else if ( config.Layout == FOUR_COLUMN )
+            else if ( layout == FOUR_COLUMN )
             {
                 for ( int i = 0; i < 4; i++ )
                 {
-                    column = new DashboardColumn( "col-md-3", i );
+                    column = new DashboardColumn( "col-md-3", string.Format( "{0}_{1}", row, i ) );
                     pnlRow.Controls.Add( column.Panel );
                     columns.Add( column );
                 }
             }
-            else if ( config.Layout == ONE_TWO_COLUMN )
+            else if ( layout == ONE_TWO_COLUMN )
             {
-                column = new DashboardColumn( "col-md-6", 0 );
+                column = new DashboardColumn( "col-md-6", string.Format( "{0}_{1}", row, 0 ) );
                 pnlRow.Controls.Add( column.Panel );
                 columns.Add( column );
 
                 for ( int i = 1; i < 3; i++ )
                 {
-                    column = new DashboardColumn( "col-md-3", i );
+                    column = new DashboardColumn( "col-md-3", string.Format( "{0}_{1}", row, i ) );
                     pnlRow.Controls.Add( column.Panel );
                     columns.Add( column );
                 }
             }
-            else if ( config.Layout == TWO_ONE_COLUMN )
+            else if ( layout == TWO_ONE_COLUMN )
             {
                 for ( int i = 0; i < 2; i++ )
                 {
-                    column = new DashboardColumn( "col-md-3", i );
+                    column = new DashboardColumn( "col-md-3", string.Format( "{0}_{1}", row, i ) );
                     pnlRow.Controls.Add( column.Panel );
                     columns.Add( column );
                 }
 
-                column = new DashboardColumn( "col-md-6", 2 );
+                column = new DashboardColumn( "col-md-6", string.Format( "{0}_{1}", row, 2 ) );
                 pnlRow.Controls.Add( column.Panel );
                 columns.Add( column );
             }
@@ -363,7 +391,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             {
                 for ( int i = 0; i < 3; i++ )
                 {
-                    column = new DashboardColumn( "col-md-4", i );
+                    column = new DashboardColumn( "col-md-4", string.Format( "{0}_{1}", row, i ) );
                     pnlRow.Controls.Add( column.Panel );
                     columns.Add( column );
                 }
@@ -386,12 +414,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 if ( sourcePage != null )
                 {
                     var blocks = GetAvailableBlocks();
-                    Panel pnlRow = new Panel { CssClass = "row" };
+                    var rows = BuildRows( config );
                     List<DashboardBlockWrapper> dashboardBlocks = new List<DashboardBlockWrapper>();
                     bool needSave = false;
-
-                    phControls.Controls.Add( pnlRow );
-                    var columns = BuildColumns( config, pnlRow );
 
                     foreach ( var block in blocks )
                     {
@@ -431,33 +456,37 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     }
 
                     //
-                    // Add all the blocks that are properly layed out already.
+                    // Add in all existing blocks that can be placed where they were last time.
                     //
-                    var existingBlocks = dashboardBlocks.Where( b => b.Config.Column < columns.Count );
-                    foreach ( var blockGroup in existingBlocks.GroupBy( b => b.Config.Column ) )
+                    List<int> existingBlocks = new List<int>();
+                    foreach ( var block in dashboardBlocks.OrderBy( b => b.Config.Row ).ThenBy( b => b.Config.Column ).ThenBy( b => b.Config.Order ) )
                     {
-                        var sortedBlocks = blockGroup.OrderBy( b => b.Config.Order );
+                        DashboardRow row = null;
 
-                        foreach ( var block in sortedBlocks )
+                        if ( block.Config.Row >= 0 && block.Config.Row < rows.Count )
                         {
-                            columns[block.Config.Column].Placeholder.Controls.Add( block );
+                            row = rows[block.Config.Row];
+                        }
+
+                        if ( row != null && block.Config.Column >= 0 && block.Config.Column < row.Count )
+                        {
+                            existingBlocks.Add( block.Config.BlockId );
+                            row[block.Config.Column].Placeholder.Controls.Add( block );
                         }
                     }
 
                     //
                     // Add in blocks that are new or don't currently fit.
                     //
-                    var newBlocks = dashboardBlocks.Where( b => b.Config.Column >= columns.Count );
-                    foreach ( var blockGroup in newBlocks.GroupBy( b => b.Config.Column ) )
+                    var newBlocks = dashboardBlocks.Where( b => !existingBlocks.Contains( b.Config.BlockId ) )
+                        .OrderBy( b => b.Config.Row )
+                        .ThenBy( b => b.Config.Column )
+                        .ThenBy( b => b.Config.Order );
+                    foreach ( var block in newBlocks )
                     {
-                        var sortedBlocks = blockGroup.OrderBy( b => b.Config.Order );
-
-                        foreach ( var block in sortedBlocks )
-                        {
-                            bool isRequired = blocks.Where( b => b.BlockId == block.Config.BlockId ).First().Required;
-                            AutoConfigBlockPlacement( config, block, columns, isRequired );
-                            needSave = true;
-                        }
+                        bool isRequired = blocks.Where( b => b.BlockId == block.Config.BlockId ).First().Required;
+                        AutoConfigBlockPlacement( config, block, rows, isRequired );
+                        needSave = true;
                     }
 
                     //
@@ -487,14 +516,18 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         /// <param name="config">The user configuration information to update.</param>
         /// <param name="block">The block wrapper tha tmus tbe placed.</param>
-        /// <param name="columns">The dashboard columns in the UI.</param>
-        private void AutoConfigBlockPlacement( DashboardConfig config, DashboardBlockWrapper block, List<DashboardColumn> columns, bool isRequired )
+        /// <param name="rows">The dashboard rows in the UI.</param>
+        private void AutoConfigBlockPlacement( DashboardConfig config, DashboardBlockWrapper block, List<DashboardRow> rows, bool isRequired )
         {
+            var columns = rows.SelectMany( c => c ).ToList();
             var shortestColumn = columns.OrderBy( c => c.Placeholder.Controls.Count ).First();
+            var row = rows.Where( r => r.Contains( shortestColumn ) ).First();
+
+            block.Config.Column = columns.IndexOf( shortestColumn );
+            block.Config.Row = rows.IndexOf( row );
 
             if ( isRequired )
             {
-                block.Config.Column = columns.IndexOf( shortestColumn );
                 block.Config.Order = 0;
                 int i = 1;
                 config.Blocks.Where( b => b.Column == block.Config.Column && b.BlockId != block.Config.BlockId )
@@ -505,7 +538,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
             else
             {
-                block.Config.Column = columns.IndexOf( shortestColumn );
                 block.Config.Order = 999;
                 int i = 0;
                 config.Blocks.Where( b => b.Column == block.Config.Column )
@@ -615,12 +647,21 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 config = JsonConvert.DeserializeObject<DashboardConfig>( configString );
                 if ( config == null )
                 {
-                    config = new DashboardConfig { Layout = GetAttributeValue( "DefaultLayout" ) };
+                    config = new DashboardConfig { Layouts = new List<string> { GetAttributeValue( "DefaultLayout" ) } };
+                }
+                
+                //
+                // Convert from the older layout system.
+                //
+                if ( !string.IsNullOrWhiteSpace( config.Layout ) )
+                {
+                    config.Layouts = new List<string> { config.Layout };
+                    config.Layout = null;
                 }
             }
             catch
             {
-                config = new DashboardConfig { Layout = GetAttributeValue( "DefaultLayout" ) };
+                config = new DashboardConfig { Layouts = new List<string> { GetAttributeValue( "DefaultLayout" ) } };
             }
 
             return config;
@@ -643,6 +684,32 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
 
             SetBlockUserPreference( "config", JsonConvert.SerializeObject( config ) );
+        }
+
+        /// <summary>
+        /// Read the current layout selection that the user has made in the repeater.
+        /// </summary>
+        private void ReadLayoutSelection()
+        {
+            List<string> layouts = new List<string>();
+
+            foreach ( RepeaterItem row in rpLayouts.Controls )
+            {
+                var rblOptionsLayout = row.FindControl( "rblOptionsLayout" ) as RadioButtonList;
+                layouts.Add( rblOptionsLayout.SelectedValue );
+            }
+
+            OptionsLayouts = layouts;
+        }
+
+        /// <summary>
+        /// Bind the layout repeater so the user can pick which layouts they want to use.
+        /// </summary>
+        private void BindLayoutOptions()
+        {
+            OptionsCanDeleteLayout = OptionsLayouts.Count > 1;
+            rpLayouts.DataSource = OptionsLayouts;
+            rpLayouts.DataBind();
         }
 
         #endregion
@@ -668,7 +735,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             var config = GetConfig();
 
-            rblOptionsLayout.SelectedValue = config.Layout;
+            OptionsLayouts = config.Layouts;
+            BindLayoutOptions();
 
             var blocks = GetAvailableBlocks();
             cblOptionsBlocks.Items.Clear();
@@ -736,7 +804,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             var config = GetConfig();
 
-            config.Layout = rblOptionsLayout.SelectedValue;
+            ReadLayoutSelection();
+            config.Layouts = OptionsLayouts;
 
             //
             // Update the selection of visible blocks based on the user's selection.
@@ -867,6 +936,60 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             mdlSettings.Hide();
         }
 
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void btnAddLayout_Click( object sender, EventArgs e )
+        {
+            ReadLayoutSelection();
+
+            var layouts = OptionsLayouts;
+            layouts.Add( GetAttributeValue( "DefaultLayout" ) );
+            OptionsLayouts = layouts;
+
+            BindLayoutOptions();
+        }
+
+        /// <summary>
+        /// Handles the ItemCommand event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RepeaterItemEventArgs"/> instance containing the event data.</param>
+        protected void rpLayouts_ItemCommand( object source, RepeaterCommandEventArgs e )
+        {
+            ReadLayoutSelection();
+
+            if ( e.CommandName == "RemoveLayout" )
+            {
+                int index = e.CommandArgument.ToString().AsInteger();
+
+                var layouts = OptionsLayouts;
+                layouts.RemoveAt( index );
+                OptionsLayouts = layouts;
+            }
+
+            BindLayoutOptions();
+        }
+
+        /// <summary>
+        /// Handles the ItemDataBound event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RepeaterItemEventArgs"/> instance containing the event data.</param>
+        protected void rpLayouts_ItemDataBound( object sender, RepeaterItemEventArgs e )
+        {
+            var layout = ( string ) e.Item.DataItem;
+            var rblOptionsLayout = e.Item.FindControl( "rblOptionsLayout" ) as RadioButtonList;
+            var btnRemoveLayout = e.Item.FindControl( "btnRemoveLayout" ) as LinkButton;
+
+            SetupLayoutButtonList( rblOptionsLayout );
+            rblOptionsLayout.SelectedValue = layout;
+            btnRemoveLayout.Visible = OptionsCanDeleteLayout;
+            btnRemoveLayout.CommandArgument = e.Item.ItemIndex.ToString();
+        }
+
         #endregion
 
         #region Classes
@@ -911,6 +1034,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             public string Layout { get; set; }
 
             /// <summary>
+            /// The new version of the layouts to use, multiple rows supported.
+            /// </summary>
+            public List<string> Layouts { get; set; }
+
+            /// <summary>
             /// The configuration of each block on this dashboard.
             /// </summary>
             public List<DashboardBlockConfig> Blocks { get; set; }
@@ -920,7 +1048,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             /// </summary>
             public DashboardConfig()
             {
-                Layout = THREE_COLUMN;
+                Layouts = new List<string>();
                 Blocks = new List<DashboardBlockConfig>();
             }
         }
@@ -946,6 +1074,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             public bool Expanded { get; set; }
 
             /// <summary>
+            /// The row number to display the block in.
+            /// </summary>
+            public int Row { get; set; }
+
+            /// <summary>
             /// The column number to display the block in.
             /// </summary>
             public int Column { get; set; }
@@ -964,9 +1097,17 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 BlockId = blockId;
                 Visible = true;
                 Expanded = true;
+                Row = 999;
                 Column = 999;
                 Order = 999;
             }
+        }
+
+        /// <summary>
+        /// This is just to make things cleaner when dealing with the code above.
+        /// </summary>
+        private class DashboardRow : List<DashboardColumn>
+        {
         }
 
         /// <summary>
@@ -989,11 +1130,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             /// </summary>
             /// <param name="cssClass">The bootstrap CSS column class to use.</param>
             /// <param name="columnIndex">The index of the column for use in the HTML5 data-column attribute.</param>
-            public DashboardColumn( string cssClass, int columnIndex )
+            public DashboardColumn( string cssClass, string identifier )
             {
                 Panel = new Panel { CssClass = cssClass };
                 Placeholder = new Panel { CssClass = "js-dashboard-column" };
-                Placeholder.Attributes.Add( "data-column", ( columnIndex + 1 ).ToString() );
+                Placeholder.Attributes.Add( "data-column", identifier );
                 Panel.Controls.Add( Placeholder );
             }
         }
@@ -1141,7 +1282,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 //
                 writer.AddAttribute( HtmlTextWriterAttribute.Class, "pull-right" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
-                writer.Write( "<a class='btn btn-xs btn-link'><i class='fa fa-bars'></i></a>" );
+                writer.Write( "<a class='btn btn-xs btn-link js-fa-bars'><i class='fa fa-bars'></i></a>" );
                 writer.Write( string.Format( "<a class='btn btn-xs btn-link'><i class='fa dashboard-state {0} js-dashboard-collapse'></i></a>", Config.Expanded ? "fa-chevron-up" : "fa-chevron-down" ) );
                 if ( ShowDelete )
                 {

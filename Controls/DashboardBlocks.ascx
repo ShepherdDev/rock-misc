@@ -22,7 +22,18 @@
 
         <Rock:ModalDialog ID="mdlOptions" runat="server" Title="Options" OnSaveClick="mdlOptions_SaveClick" ValidationGroup="Options">
             <Content>
-                <Rock:RockRadioButtonList ID="rblOptionsLayout" runat="server" Label="Layout" Help="The column configuration you want to use." RepeatDirection="Horizontal" />
+                <Rock:RockControlWrapper ID="cwLayout" runat="server" Label="Layout" Help="The column configuration you want to use.">
+                    <asp:Repeater ID="rpLayouts" runat="server" OnItemCommand="rpLayouts_ItemCommand" OnItemDataBound="rpLayouts_ItemDataBound">
+                        <ItemTemplate>
+                            <div class="margin-b-sm">
+                                <asp:RadioButtonList ID="rblOptionsLayout" runat="server" RepeatDirection="Horizontal" />
+                                <asp:LinkButton ID="btnRemoveLayout" runat="server" CssClass="btn btn-xs btn-danger margin-l-sm" CommandName="RemoveLayout"><i class="fa fa-times"></i></asp:LinkButton>
+                            </div>
+                        </ItemTemplate>
+                    </asp:Repeater>
+                </Rock:RockControlWrapper>
+
+                <asp:LinkButton ID="btnAddLayout" runat="server" CssClass="btn btn-link" Text="Add Layout" OnClick="btnAddLayout_Click" />
 
                 <Rock:RockCheckBoxList ID="cblOptionsBlocks" runat="server" Label="Widgets" Help="Which widgets are visible on your dashboard." RepeatDirection="Vertical" />
 
