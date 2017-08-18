@@ -30,6 +30,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     public partial class DashboardBlocks : RockBlockCustomSettings
     {
         private const string TWO_COLUMN = "2-col";
+        private const string TWO_COLUMN_LEFT = "2-col-left";
+        private const string TWO_COLUMN_RIGHT = "2-col-right";
         private const string THREE_COLUMN = "3-col";
         private const string FOUR_COLUMN = "4-col";
         private const string ONE_TWO_COLUMN = "1-2-col";
@@ -232,6 +234,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             rbl.Items.Clear();
             rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 50%'><div></div></div><div style='width: 50%'><div></div></div></div>", TWO_COLUMN ) );
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 66%'><div></div></div><div style='width: 33%'><div></div></div></div>", TWO_COLUMN_LEFT ) );
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 33%'><div></div></div><div style='width: 66%'><div></div></div></div>", TWO_COLUMN_RIGHT ) );
             rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 33%'><div></div></div><div style='width: 33%'><div></div></div><div style='width: 33%'><div></div></div></div>", THREE_COLUMN ) );
             rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div></div>", FOUR_COLUMN ) );
             rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 50%'><div></div></div><div style='width: 25%'><div></div></div><div style='width: 25%'><div></div></div></div>", ONE_TWO_COLUMN ) );
@@ -351,6 +355,26 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     pnlRow.Controls.Add( column.Panel );
                     columns.Add( column );
                 }
+            }
+            else if ( layout == TWO_COLUMN_LEFT )
+            {
+                column = new DashboardColumn( "col-md-8", string.Format( "{0}_{1}", row, 0 ) );
+                pnlRow.Controls.Add( column.Panel );
+                columns.Add( column );
+
+                column = new DashboardColumn( "col-md-4", string.Format( "{0}_{1}", row, 1 ) );
+                pnlRow.Controls.Add( column.Panel );
+                columns.Add( column );
+            }
+            else if ( layout == TWO_COLUMN_RIGHT )
+            {
+                column = new DashboardColumn( "col-md-4", string.Format( "{0}_{1}", row, 0 ) );
+                pnlRow.Controls.Add( column.Panel );
+                columns.Add( column );
+
+                column = new DashboardColumn( "col-md-8", string.Format( "{0}_{1}", row, 1 ) );
+                pnlRow.Controls.Add( column.Panel );
+                columns.Add( column );
             }
             else if ( layout == FOUR_COLUMN )
             {
@@ -1133,7 +1157,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             public DashboardColumn( string cssClass, string identifier )
             {
                 Panel = new Panel { CssClass = cssClass };
-                Placeholder = new Panel { CssClass = "js-dashboard-column" };
+                Placeholder = new Panel { CssClass = "js-dashboard-column dashboard-column" };
                 Placeholder.Attributes.Add( "data-column", identifier );
                 Panel.Controls.Add( Placeholder );
             }
