@@ -29,6 +29,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     [TextField( "Default Layout", "The default layout that will be used by new users.", false, DashboardBlocks.THREE_COLUMN, "CustomSetting" )]
     public partial class DashboardBlocks : RockBlockCustomSettings
     {
+        private const string ONE_COLUMN = "1-col";
         private const string TWO_COLUMN = "2-col";
         private const string TWO_COLUMN_LEFT = "2-col-left";
         private const string TWO_COLUMN_RIGHT = "2-col-right";
@@ -233,6 +234,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         private void SetupLayoutButtonList(RadioButtonList rbl)
         {
             rbl.Items.Clear();
+            rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 100%'><div></div></div></div>", ONE_COLUMN ) );
             rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 50%'><div></div></div><div style='width: 50%'><div></div></div></div>", TWO_COLUMN ) );
             rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 66%'><div></div></div><div style='width: 33%'><div></div></div></div>", TWO_COLUMN_LEFT ) );
             rbl.Items.Add( new ListItem( "<div class='dashboard-layout'><div style='width: 33%'><div></div></div><div style='width: 66%'><div></div></div></div>", TWO_COLUMN_RIGHT ) );
@@ -347,7 +349,13 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             DashboardRow columns = new DashboardRow();
             DashboardColumn column;
 
-            if ( layout == TWO_COLUMN )
+            if ( layout == ONE_COLUMN )
+            {
+                column = new DashboardColumn( "col-md-12", string.Format( "{0}_{1}", row, 0 ) );
+                pnlRow.Controls.Add( column.Panel );
+                columns.Add( column );
+            }
+            else if ( layout == TWO_COLUMN )
             {
                 for ( int i = 0; i < 2; i++ )
                 {
