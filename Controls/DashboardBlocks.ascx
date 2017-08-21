@@ -43,6 +43,12 @@
 
         <Rock:ModalDialog ID="mdlSettings" runat="server" Title="Settings" OnSaveClick="mdlSettings_SaveClick" ValidationGroup="Settings">
             <Content>
+                <Rock:PagePicker ID="ppSettingsSourcePage" runat="server" Label="Source Page" Help="The page that contains the blocks to display to the user." Required="true" />
+
+                <Rock:RockTextBox ID="tbSettingsTitle" runat="server" Label="Title" Help="The title to display in the dashboard container." Required="true" />
+
+                <Rock:RockTextBox ID="tbSettingsIconCSSClass" runat="server" Label="Icon CSS Class" Help="The CSS class to use for an icon, such as 'fa fa-tasks'." />
+
                 <Rock:RockRadioButtonList ID="rblSettingsDefaultLayout" runat="server" Label="Default Layout" Help="The column configuration you want users to use by default." RepeatDirection="Horizontal" Required="true" />
 
                 <Rock:Grid ID="gSettingsBlocks" runat="server" Title="Blocks">

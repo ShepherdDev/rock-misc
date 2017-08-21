@@ -10,6 +10,8 @@ using Newtonsoft.Json;
 
 using Rock;
 using Rock.Attribute;
+using Rock.Data;
+using Rock.Model;
 using Rock.Security;
 using Rock.Web;
 using Rock.Web.Cache;
@@ -21,10 +23,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     [Category( "Shepherd Church > Misc" )]
     [Description( "Display blocks on the page while allowing the user to show/hide and reorganize the blocks at will." )]
 
-    [LinkedPage( "Source Page", "The page that contains the blocks to display to the user.", true, "", order: 0 )]
-    [TextField( "Title", "The title to display in the dashboard container.", true, "Dashboard", order: 1 )]
-    [TextField( "Icon CSS Class", "The CSS class to use for an icon, such as 'fa fa-tasks'.", false, "", order: 2 )]
-
+    [LinkedPage( "Source Page", "The page that contains the blocks to display to the user.", true, "", "CustomSetting" )]
+    [TextField( "Title", "The title to display in the dashboard container.", true, "Dashboard", "CustomSetting" )]
+    [TextField( "Icon CSS Class", "The CSS class to use for an icon, such as 'fa fa-tasks'.", false, "", "CustomSetting" )]
     [TextField( "Available Blocks", "The blocks that have been enabled.", false, "", "CustomSetting" )]
     [TextField( "Default Layout", "The default layout that will be used by new users.", false, DashboardBlocks.THREE_COLUMN, "CustomSetting" )]
     public partial class DashboardBlocks : RockBlockCustomSettings
@@ -932,6 +933,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 }
             }
 
+            var page = new PageService( new RockContext() ).Get( GetAttributeValue( "SourcePage" ).AsGuid() );
+
+            ppSettingsSourcePage.SetValue( page != null ? ( int? ) page.Id : null );
+            tbSettingsTitle.Text = GetAttributeValue( "Title" );
+            tbSettingsIconCSSClass.Text = GetAttributeValue( "IconCSSClass" );
+
             rblSettingsDefaultLayout.SelectedValue = GetAttributeValue( "DefaultLayout" );
 
             AvailableBlocksLive = blockTypes;
@@ -960,6 +967,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 blockType.Required = cbRequired.Checked;
                 blockType.DefaultVisible = cbDefaultVisible.Checked;
             }
+
+            var page = PageCache.Read( ppSettingsSourcePage.SelectedValueAsId().Value );
+            SetAttributeValue( "SourcePage", page.Guid.ToString() );
+            SetAttributeValue( "Title", tbSettingsTitle.Text );
+            SetAttributeValue( "IconCSSClass", tbSettingsIconCSSClass.Text );
 
             SetAttributeValue( "DefaultLayout", rblSettingsDefaultLayout.SelectedValue );
             SetAttributeValue( "AvailableBlocks", JsonConvert.SerializeObject( blockTypes ) );
