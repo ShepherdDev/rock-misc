@@ -1318,7 +1318,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 writer.Write( string.Format( "<a class='btn btn-xs btn-link'><i class='fa dashboard-state {0} js-dashboard-collapse'></i></a>", Config.Expanded ? "fa-chevron-up" : "fa-chevron-down" ) );
                 if ( ShowDelete )
                 {
-                    writer.Write( "<a class='btn btn-xs btn-danger js-remove-block'><i class='fa fa-times'></i></a>" );
+                    writer.Write( "<a class='btn btn-xs btn-link js-remove-block'><i class='fa fa-times'></i></a>" );
                 }
                 writer.RenderEndTag();  // pull-right
 
