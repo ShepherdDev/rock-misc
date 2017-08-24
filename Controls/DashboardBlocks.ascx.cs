@@ -713,8 +713,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             try
             {
-                config = JsonConvert.DeserializeObject<DashboardConfig>( configString );
-                config = null;
+                if ( PageParameter( "ClearConfig" ).AsBoolean() == false )
+                {
+                    config = JsonConvert.DeserializeObject<DashboardConfig>( configString );
+                }
+
                 if ( config == null )
                 {
                     config = new DashboardConfig { Layouts = new List<string> { GetAttributeValue( "DefaultLayout" ) } };
