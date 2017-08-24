@@ -491,6 +491,10 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                             var blockWrapper = new DashboardBlockWrapper( blockControl, block.BlockCache, blockConfig );
                             blockWrapper.ShowDelete = !block.Required;
+                            blockWrapper.IconCssClass = string.Join( " ", block.BlockCache.CssClass.SplitDelimitedValues()
+                                .Where( c => c.StartsWith( "icon-" ) )
+                                .Select( c => c.Substring( 5 ) )
+                              );
 
                             dashboardBlocks.Add( blockWrapper );
                         }
@@ -1335,9 +1339,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             public DashboardBlockConfig Config { get; set; }
 
             /// <summary>
-            /// Wether or not to show the Delete button.
+            /// Whether or not to show the Delete button.
             /// </summary>
             public bool ShowDelete { get; set; }
+
+            /// <summary>
+            /// Displays an icon to the left of the title.
+            /// </summary>
+            public string IconCssClass { get; set; }
 
             #endregion
 
@@ -1452,6 +1461,13 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
                 writer.AddAttribute( HtmlTextWriterAttribute.Class, "panel-title clickable js-dashboard-collapse" );
                 writer.RenderBeginTag( HtmlTextWriterTag.H3 );
+                if ( !string.IsNullOrWhiteSpace( IconCssClass ) )
+                {
+                    writer.AddAttribute( HtmlTextWriterAttribute.Class, IconCssClass );
+                    writer.RenderBeginTag( HtmlTextWriterTag.I );
+                    writer.RenderEndTag();
+                    writer.Write( " " );
+                }
                 writer.Write( _rockBlock.BlockName );
                 writer.RenderEndTag();  // panel-title
                 writer.RenderEndTag();  // pull-left
