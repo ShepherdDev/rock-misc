@@ -16,6 +16,7 @@ using Rock.Security;
 using Rock.Web;
 using Rock.Web.Cache;
 using Rock.Web.UI;
+using Rock.Web.UI.Controls;
 
 namespace RockWeb.Plugins.com_shepherdchurch.Misc
 {
@@ -59,13 +60,20 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             get
             {
-                return JsonConvert.DeserializeObject<List<DashboardBlockType>>( ( string )ViewState["AvailableBlocksLive"] );
+                if ( _availableBlocksLive == null )
+                {
+                    _availableBlocksLive = JsonConvert.DeserializeObject<List<DashboardBlockType>>( ( string ) ViewState["AvailableBlocksLive"] );
+                }
+
+                return _availableBlocksLive;
             }
             set
             {
+                _availableBlocksLive = value;
                 ViewState["AvailableBlocksLive"] = value != null ? JsonConvert.SerializeObject( value ) : null;
             }
         }
+        private List<DashboardBlockType> _availableBlocksLive = null;
 
         #region Base Method Overrides
 
@@ -517,8 +525,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         .ThenBy( b => b.Config.Order );
                     foreach ( var block in newBlocks )
                     {
-                        bool isRequired = blocks.Where( b => b.BlockId == block.Config.BlockId ).First().Required;
-                        AutoConfigBlockPlacement( config, block, rows, isRequired );
+                        AutoConfigBlockPlacement( config, block, rows, blocks.Where( b => b.BlockId == block.Config.BlockId ).First() );
                         needSave = true;
                     }
 
@@ -537,6 +544,44 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                     if ( needSave )
                     {
+                        //
+                        // Reorder everything properly since something has changed.
+                        //
+                        var visibleBlocks = config.Blocks.Where( b => b.Visible );
+                        foreach ( var rowGroup in visibleBlocks.GroupBy( b => b.Row ) )
+                        {
+                            foreach ( var colGroup in rowGroup.GroupBy( b => b.Column ) )
+                            {
+                                int i = 0;
+                                foreach ( var b in colGroup.OrderBy( b => b.Order ) )
+                                {
+                                    b.Order = i++;
+                                }
+                            }
+                        }
+
+                        //
+                        // Re-order the on-screen controls to match any new ordering.
+                        //
+                        foreach ( var row in rows )
+                        {
+                            foreach ( var column in row )
+                            {
+                                List<DashboardBlockWrapper> controls = new List<DashboardBlockWrapper>();
+
+                                foreach ( var control in column.Placeholder.Controls )
+                                {
+                                    controls.Add( ( DashboardBlockWrapper ) control );
+                                }
+
+                                column.Placeholder.Controls.Clear();
+
+                                controls = controls.OrderBy( c => c.Config.Order ).ToList();
+
+                                controls.ForEach( c => column.Placeholder.Controls.Add( c ) );
+                            }
+                        }
+
                         SaveConfig( config );
                     }
                 }
@@ -550,35 +595,26 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <param name="config">The user configuration information to update.</param>
         /// <param name="block">The block wrapper tha tmus tbe placed.</param>
         /// <param name="rows">The dashboard rows in the UI.</param>
-        private void AutoConfigBlockPlacement( DashboardConfig config, DashboardBlockWrapper block, List<DashboardRow> rows, bool isRequired )
+        private void AutoConfigBlockPlacement( DashboardConfig config, DashboardBlockWrapper block, List<DashboardRow> rows, DashboardBlockType blockType )
         {
-            var columns = rows.SelectMany( c => c ).ToList();
+            var blockConfig = config.Blocks.Where( b => b.BlockId == block.Config.BlockId ).FirstOrDefault();
+            var columns = rows.First();
             var shortestColumn = columns.OrderBy( c => c.Placeholder.Controls.Count ).First();
-            var row = rows.Where( r => r.Contains( shortestColumn ) ).First();
 
             block.Config.Column = columns.IndexOf( shortestColumn );
-            block.Config.Row = rows.IndexOf( row );
+            block.Config.Row = 0;
 
-            if ( isRequired )
+            if ( blockType.Required || blockType.DefaultVisible )
             {
-                block.Config.Order = 0;
-                int i = 1;
-                config.Blocks.Where( b => b.Column == block.Config.Column && b.BlockId != block.Config.BlockId )
-                    .ToList()
-                    .ForEach( b => b.Order = i++ );
-
-                columns[block.Config.Column].Placeholder.Controls.AddAt(0, block );
+                block.Config.Column = blockType.DefaultColumn;
+                block.Config.Order = blockType.DefaultOrder;
             }
             else
             {
                 block.Config.Order = 999;
-                int i = 0;
-                config.Blocks.Where( b => b.Column == block.Config.Column )
-                    .ToList()
-                    .ForEach( b => b.Order = i++ );
-
-                columns[block.Config.Column].Placeholder.Controls.Add( block );
             }
+
+            columns[block.Config.Column].Placeholder.Controls.Add( block );
         }
 
         /// <summary>
@@ -678,6 +714,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             try
             {
                 config = JsonConvert.DeserializeObject<DashboardConfig>( configString );
+                config = null;
                 if ( config == null )
                 {
                     config = new DashboardConfig { Layouts = new List<string> { GetAttributeValue( "DefaultLayout" ) } };
@@ -743,6 +780,45 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             OptionsCanDeleteLayout = OptionsLayouts.Count > 1;
             rpLayouts.DataSource = OptionsLayouts;
             rpLayouts.DataBind();
+        }
+
+        /// <summary>
+        /// Read the available block type information from the grid.
+        /// </summary>
+        protected void ReadAvailableBlockTypes()
+        {
+            var blockTypes = AvailableBlocksLive;
+
+            foreach ( var blockType in blockTypes )
+            {
+                blockType.BlockCache = BlockCache.Read( blockType.BlockId );
+            }
+
+            foreach ( GridViewRow row in gSettingsBlocks.Rows.OfType<GridViewRow>() )
+            {
+                var blockId = row.Cells[0].Text.AsInteger();
+                var cbRequired = row.FindControl( "cbRequired" ) as CheckBox;
+                var cbDefaultVisible = row.FindControl( "cbVisibleByDefault" ) as CheckBox;
+                var nudDefaultColumn = row.FindControl( "nudDefaultColumn" ) as NumberUpDown;
+                var nudDefaultOrder = row.FindControl( "nudDefaultOrder" ) as NumberUpDown;
+
+                var blockType = blockTypes.Where( b => b.BlockId == blockId ).First();
+                blockType.Required = cbRequired.Checked;
+                blockType.DefaultVisible = cbDefaultVisible.Checked;
+                blockType.DefaultColumn = nudDefaultColumn.Value;
+                blockType.DefaultOrder = nudDefaultOrder.Value;
+            }
+
+            AvailableBlocksLive = blockTypes;
+        }
+
+        /// <summary>
+        /// Bind the grid view showing the block types.
+        /// </summary>
+        protected void BindSettingsBlocks()
+        {
+            gSettingsBlocks.DataSource = AvailableBlocksLive;
+            gSettingsBlocks.DataBind();
         }
 
         #endregion
@@ -933,6 +1009,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 }
             }
 
+            //
+            // Fix old block types that might have been marked required but not visible by default.
+            //
+            blockTypes.Where( b => b.Required ).ToList().ForEach( b => b.DefaultVisible = true );
+
             var page = new PageService( new RockContext() ).Get( GetAttributeValue( "SourcePage" ).AsGuid() );
 
             ppSettingsSourcePage.SetValue( page != null ? ( int? ) page.Id : null );
@@ -942,8 +1023,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             rblSettingsDefaultLayout.SelectedValue = GetAttributeValue( "DefaultLayout" );
 
             AvailableBlocksLive = blockTypes;
-            gSettingsBlocks.DataSource = blockTypes;
-            gSettingsBlocks.DataBind();
+            BindSettingsBlocks();
 
             mdlSettings.Show();
         }
@@ -955,18 +1035,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void mdlSettings_SaveClick( object sender, EventArgs e )
         {
+            ReadAvailableBlockTypes();
             var blockTypes = AvailableBlocksLive;
-
-            foreach ( GridViewRow row in gSettingsBlocks.Rows.OfType<GridViewRow>() )
-            {
-                var blockId = row.Cells[0].Text.AsInteger();
-                var cbRequired = row.Cells[2].Controls[0] as CheckBox;
-                var cbDefaultVisible = row.Cells[3].Controls[0] as CheckBox;
-
-                var blockType = blockTypes.Where( b => b.BlockId == blockId ).First();
-                blockType.Required = cbRequired.Checked;
-                blockType.DefaultVisible = cbDefaultVisible.Checked;
-            }
 
             var page = PageCache.Read( ppSettingsSourcePage.SelectedValueAsId().Value );
             SetAttributeValue( "SourcePage", page.Guid.ToString() );
@@ -1034,6 +1104,58 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             btnRemoveLayout.CommandArgument = e.Item.ItemIndex.ToString();
         }
 
+        /// <summary>
+        /// Handles the CheckChanged event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void cbRequired_CheckedChanged( object sender, EventArgs e )
+        {
+            ReadAvailableBlockTypes();
+            BindSettingsBlocks();
+        }
+
+        /// <summary>
+        /// Handles the GridRebind event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void gSettingsBlocks_GridRebind( object sender, Rock.Web.UI.Controls.GridRebindEventArgs e )
+        {
+            BindSettingsBlocks();
+        }
+
+        /// <summary>
+        /// Handles the RowDataBound event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void gSettingsBlocks_RowDataBound( object sender, GridViewRowEventArgs e )
+        {
+            if ( e.Row.RowType == DataControlRowType.DataRow )
+            {
+                var cbRequired = e.Row.FindControl( "cbRequired" ) as RockCheckBox;
+                var cbVisibleByDefault = e.Row.FindControl( "cbVisibleByDefault" ) as RockCheckBox;
+                var nudDefaultColumn = e.Row.FindControl( "nudDefaultColumn" ) as NumberUpDown;
+                var nudDefaultOrder = e.Row.FindControl( "nudDefaultOrder" ) as NumberUpDown;
+
+                cbVisibleByDefault.Enabled = !cbRequired.Checked;
+                nudDefaultColumn.Visible = cbRequired.Checked || cbVisibleByDefault.Checked;
+                nudDefaultOrder.Visible = cbRequired.Checked || cbVisibleByDefault.Checked;
+            }
+        }
+
+        /// <summary>
+        /// Handles the CheckedChange event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void cbVisibleByDefault_CheckedChanged( object sender, EventArgs e )
+        {
+            ReadAvailableBlockTypes();
+            BindSettingsBlocks();
+        }
+
         #endregion
 
         #region Classes
@@ -1065,6 +1187,16 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             /// True if the block is visible by default for a new user.
             /// </summary>
             public bool DefaultVisible { get; set; }
+
+            /// <summary>
+            /// The default column to place this block if the user does not already have it on screen.
+            /// </summary>
+            public int DefaultColumn { get; set; }
+
+            /// <summary>
+            /// The default sort order to place this block if the user does not already have it on screen.
+            /// </summary>
+            public int DefaultOrder { get; set; }
         }
 
         /// <summary>

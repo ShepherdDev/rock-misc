@@ -51,14 +51,34 @@
 
                 <Rock:RockRadioButtonList ID="rblSettingsDefaultLayout" runat="server" Label="Default Layout" Help="The column configuration you want users to use by default." RepeatDirection="Horizontal" Required="true" />
 
-                <Rock:Grid ID="gSettingsBlocks" runat="server" Title="Blocks">
-                    <Columns>
-                        <asp:BoundField DataField="BlockId" HeaderStyle-CssClass="hidden" ItemStyle-CssClass="hidden" />
-                        <asp:BoundField DataField="BlockCache.Name" HeaderText="Block" />
-                        <Rock:CheckBoxEditableField DataField="Required" HeaderText="Required"></Rock:CheckBoxEditableField>
-                        <Rock:CheckBoxEditableField DataField="DefaultVisible" HeaderText="Visible By Default"></Rock:CheckBoxEditableField>
-                    </Columns>
-                </Rock:Grid>
+                <Rock:RockControlWrapper ID="cwSettingsBlocks" runat="server" Label="Blocks">
+                    <Rock:Grid ID="gSettingsBlocks" runat="server" Title="Blocks" OnGridRebind="gSettingsBlocks_GridRebind" OnRowDataBound="gSettingsBlocks_RowDataBound">
+                        <Columns>
+                            <asp:BoundField DataField="BlockId" HeaderStyle-CssClass="hidden" ItemStyle-CssClass="hidden" />
+                            <asp:BoundField DataField="BlockCache.Name" HeaderText="Block" />
+                            <Rock:RockTemplateField HeaderText="Required" ItemStyle-CssClass="grid-select-field">
+                                <ItemTemplate>
+                                    <Rock:RockCheckBox ID="cbRequired" runat="server" Checked='<%# Eval("Required") %>' OnCheckedChanged="cbRequired_CheckedChanged" AutoPostBack="true" />
+                                </ItemTemplate>
+                            </Rock:RockTemplateField>
+                            <Rock:RockTemplateField HeaderText="Visible By Default" ItemStyle-CssClass="grid-select-field">
+                                <ItemTemplate>
+                                    <Rock:RockCheckBox ID="cbVisibleByDefault" runat="server" Checked='<%# Eval("DefaultVisible") %>' OnCheckedChanged="cbVisibleByDefault_CheckedChanged" AutoPostBack="true" />
+                                </ItemTemplate>
+                            </Rock:RockTemplateField>
+                            <Rock:RockTemplateField HeaderText="Default Column" ItemStyle-HorizontalAlign="Center">
+                                <ItemTemplate>
+                                    <Rock:NumberUpDown ID="nudDefaultColumn" runat="server" CssClass="input-sm" Required="false" Minimum="0" Maximum="4" Value='<%# Eval("DefaultColumn") %>' />
+                                </ItemTemplate>
+                            </Rock:RockTemplateField>
+                            <Rock:RockTemplateField HeaderText="Default Order" ItemStyle-HorizontalAlign="Center">
+                                <ItemTemplate>
+                                    <Rock:NumberUpDown ID="nudDefaultOrder" runat="server" CssClass="input-sm" Required="false" Minimum="0" Maximum="999" Value='<%# Eval("DefaultOrder") %>' />
+                                </ItemTemplate>
+                            </Rock:RockTemplateField>
+                        </Columns>
+                    </Rock:Grid>
+                </Rock:RockControlWrapper>
             </Content>
         </Rock:ModalDialog>
     </ContentTemplate>
