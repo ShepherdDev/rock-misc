@@ -1112,54 +1112,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
 
         /// <summary>
-        /// Handles the CheckChanged event of the control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected void cbRequired_CheckedChanged( object sender, EventArgs e )
-        {
-            ReadAvailableBlockTypes();
-            BindSettingsBlocks();
-        }
-
-        /// <summary>
         /// Handles the GridRebind event of the control.
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void gSettingsBlocks_GridRebind( object sender, Rock.Web.UI.Controls.GridRebindEventArgs e )
         {
-            BindSettingsBlocks();
-        }
-
-        /// <summary>
-        /// Handles the RowDataBound event of the control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected void gSettingsBlocks_RowDataBound( object sender, GridViewRowEventArgs e )
-        {
-            if ( e.Row.RowType == DataControlRowType.DataRow )
-            {
-                var cbRequired = e.Row.FindControl( "cbRequired" ) as RockCheckBox;
-                var cbVisibleByDefault = e.Row.FindControl( "cbVisibleByDefault" ) as RockCheckBox;
-                var nudDefaultColumn = e.Row.FindControl( "nudDefaultColumn" ) as NumberUpDown;
-                var nudDefaultOrder = e.Row.FindControl( "nudDefaultOrder" ) as NumberUpDown;
-
-                cbVisibleByDefault.Enabled = !cbRequired.Checked;
-                nudDefaultColumn.Visible = cbRequired.Checked || cbVisibleByDefault.Checked;
-                nudDefaultOrder.Visible = cbRequired.Checked || cbVisibleByDefault.Checked;
-            }
-        }
-
-        /// <summary>
-        /// Handles the CheckedChange event of the control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected void cbVisibleByDefault_CheckedChanged( object sender, EventArgs e )
-        {
-            ReadAvailableBlockTypes();
             BindSettingsBlocks();
         }
 

@@ -52,28 +52,28 @@
                 <Rock:RockRadioButtonList ID="rblSettingsDefaultLayout" runat="server" Label="Default Layout" Help="The column configuration you want users to use by default." RepeatDirection="Horizontal" Required="true" />
 
                 <Rock:RockControlWrapper ID="cwSettingsBlocks" runat="server" Label="Blocks">
-                    <Rock:Grid ID="gSettingsBlocks" runat="server" Title="Blocks" OnGridRebind="gSettingsBlocks_GridRebind" OnRowDataBound="gSettingsBlocks_RowDataBound">
+                    <Rock:Grid ID="gSettingsBlocks" runat="server" Title="Blocks" OnGridRebind="gSettingsBlocks_GridRebind" RowStyle-CssClass="js-block-row">
                         <Columns>
                             <asp:BoundField DataField="BlockId" HeaderStyle-CssClass="hidden" ItemStyle-CssClass="hidden" />
                             <asp:BoundField DataField="BlockCache.Name" HeaderText="Block" />
                             <Rock:RockTemplateField HeaderText="Required" ItemStyle-CssClass="grid-select-field">
                                 <ItemTemplate>
-                                    <Rock:RockCheckBox ID="cbRequired" runat="server" Checked='<%# Eval("Required") %>' OnCheckedChanged="cbRequired_CheckedChanged" AutoPostBack="true" />
+                                    <Rock:RockCheckBox ID="cbRequired" runat="server" Checked='<%# Eval("Required") %>' CssClass="js-block-required" />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
                             <Rock:RockTemplateField HeaderText="Visible By Default" ItemStyle-CssClass="grid-select-field">
                                 <ItemTemplate>
-                                    <Rock:RockCheckBox ID="cbVisibleByDefault" runat="server" Checked='<%# Eval("DefaultVisible") %>' OnCheckedChanged="cbVisibleByDefault_CheckedChanged" AutoPostBack="true" />
+                                    <Rock:RockCheckBox ID="cbVisibleByDefault" runat="server" Checked='<%# Eval("DefaultVisible") %>' CssClass="js-block-default" />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
                             <Rock:RockTemplateField HeaderText="Default Column" ItemStyle-HorizontalAlign="Center">
                                 <ItemTemplate>
-                                    <Rock:NumberUpDown ID="nudDefaultColumn" runat="server" CssClass="input-sm" Required="false" Minimum="0" Maximum="4" Value='<%# Eval("DefaultColumn") %>' />
+                                    <Rock:NumberUpDown ID="nudDefaultColumn" runat="server" CssClass="input-sm js-block-position" Required="false" Minimum="0" Maximum="4" Value='<%# Eval("DefaultColumn") %>' />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
                             <Rock:RockTemplateField HeaderText="Default Order" ItemStyle-HorizontalAlign="Center">
                                 <ItemTemplate>
-                                    <Rock:NumberUpDown ID="nudDefaultOrder" runat="server" CssClass="input-sm" Required="false" Minimum="0" Maximum="999" Value='<%# Eval("DefaultOrder") %>' />
+                                    <Rock:NumberUpDown ID="nudDefaultOrder" runat="server" CssClass="input-sm js-block-position" Required="false" Minimum="0" Maximum="999" Value='<%# Eval("DefaultOrder") %>' />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
                         </Columns>
@@ -92,5 +92,38 @@
                 </Rock:NotificationBox>
             </Content>
         </Rock:ModalDialog>
+
+        <script>
+            Sys.Application.add_load(function ()
+            {
+                function updateRows()
+                {
+                    $('.js-block-row').each(function ()
+                    {
+                        var $isRequired = $(this).find('.js-block-required');
+                        var $isDefault = $(this).find('.js-block-default');
+
+                        if ($isRequired.is(':checked'))
+                        {
+                            $isDefault.attr('checked', true);
+                        }
+                        $isDefault.attr('disabled', $isRequired.is(':checked'));
+
+                        if ($isDefault.is(':checked'))
+                        {
+                            $(this).find('.js-block-position').removeClass('invisible');
+                        }
+                        else
+                        {
+                            $(this).find('.js-block-position').addClass('invisible');
+                        }
+                    });
+                }
+
+                $('#<%= gSettingsBlocks.ClientID %> .js-block-required,#<%= gSettingsBlocks.ClientID %> .js-block-default').on('change', function () { updateRows(); });
+
+                updateRows();
+            });
+        </script>
     </ContentTemplate>
 </asp:UpdatePanel>
