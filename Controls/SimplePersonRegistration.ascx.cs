@@ -25,6 +25,7 @@ namespace Plugins.com_shepherdchurch.Misc
     [CustomDropdownListField( "Home Address", "Whether or not to request/require the home address be filled in by the user.", "Hidden,Optional,Required", true, "Hidden", order: 4 )]
     [DefinedValueField( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS, "Connection Status", "The connection status to use for new individuals (default: 'Web Prospect'.)", true, false, Rock.SystemGuid.DefinedValue.PERSON_CONNECTION_STATUS_WEB_PROSPECT, order: 5 )]
     [DefinedValueField( Rock.SystemGuid.DefinedType.PERSON_RECORD_STATUS, "Record Status", "The record status to use for new individuals (default: 'Pending'.)", true, false, Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_PENDING, order: 6 )]
+    [TextField( "Include Parameters", "A comma separated list of Page Parameters or Query String Parameters that will be passed on to the Registration Complete page. If left blank then all parameters are passed.", false, "", order: 7 )]
     public partial class SimplePersonRegistration : RockBlock
     {
         #region Base Method Overrides
@@ -120,6 +121,43 @@ namespace Plugins.com_shepherdchurch.Misc
             History.EvaluateChange( changes, string.Format( "{0} Phone", phoneType.Value ), oldPhone, phoneNumber.NumberFormattedWithCountryCode );
         }
 
+        /// <summary>
+        /// Retrieves the standard navigation parameters that will be passed to linked pages.
+        /// </summary>
+        /// <returns>Dictionary of strings which identifies the navigation parameters</returns>
+        Dictionary<string, string> GetNavigationParameters()
+        {
+            var parameters = PageParameters();
+
+            //
+            // If they have not defined any included parameters, include everything except
+            // the PageId as that is a standard parameter in all requests.
+            //
+            if ( string.IsNullOrWhiteSpace( PageParameter( "IncludeParameters" ) ) )
+            {
+                return parameters
+                    .Keys
+                    .Where( k => k != "PageId" )
+                    .ToDictionary( k => k, k => parameters[k].ToString() );
+            }
+
+            //
+            // Otherwise make a list of the parameters they want to include.
+            //
+            List<string> include = PageParameter( "IncludeParameters" )
+                .Split( ',' )
+                .Select( s => s.Trim() )
+                .ToList();
+
+            //
+            // And generate navigation parameters based on that.
+            //
+            return parameters
+                .Keys
+                .Where( k => include.Contains( k ) )
+                .ToDictionary( k => k, k => parameters[k].ToString() );
+        }
+
         #endregion
 
         #region Event Handlers
@@ -141,7 +179,7 @@ namespace Plugins.com_shepherdchurch.Misc
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void btnSubmit_Click( object sender, EventArgs e )
         {
-            var queryParameters = new Dictionary<string, string>();
+            var queryParameters = GetNavigationParameters();
             var person = GetPerson( new RockContext() );
 
             if ( GetAttributeValue( "PassPerson" ) == "Id" )
