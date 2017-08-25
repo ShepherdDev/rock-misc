@@ -79,6 +79,17 @@
                         </Columns>
                     </Rock:Grid>
                 </Rock:RockControlWrapper>
+
+                <Rock:NotificationBox ID="nbCssTips" runat="server" NotificationBoxType="Info">
+                    <p>The follow CSS classes can be added to blocks to improve their appearence when displayed on the dashboard:</p>
+                    <ul>
+                        <li><code>dashboard-panel-block</code>: Removes some of the extra padding around the block when it displays its own full panel.</li>
+                        <li><code>dashboard-panel-hide-title</code>: Hides the title bar of the block if it includes its own full panel.</li>
+                        <li><code>icon-</code>: This prefix can be used to add CSS icons to the dashboard block.
+                            The <code>icon-</code> is stripped out and then used as the icon class.
+                            Example: <code>icon-fa icon-fa-line-chart</code> would render as <code>fa fa-line-chart</code>.</li>
+                    </ul>
+                </Rock:NotificationBox>
             </Content>
         </Rock:ModalDialog>
     </ContentTemplate>
