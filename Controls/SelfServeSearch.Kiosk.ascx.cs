@@ -289,9 +289,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// </summary>
         private void BuildPersonControls()
         {
-            lbPersonSelectAdd.Visible = !string.IsNullOrWhiteSpace( PageParameter( "RegisterPage" ) );
-            lbPersonSelectAdd.Text = ( !string.IsNullOrWhiteSpace( PageParameter( "RegisterPage" ) ) ).ToString();
-            lbPersonSelectAdd.Visible = true;
+            lbPersonSelectAdd.Visible = !string.IsNullOrWhiteSpace( GetAttributeValue( "RegisterPage" ) );
 
             //
             // If we have any results then build the link buttons for the user to click.
