@@ -716,6 +716,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 }
             }
 
+            //
+            // Sort the block types by name.
+            //
+            blockTypes = blockTypes.OrderBy( b => b.BlockCache.Name ).ToList();
+
             return blockTypes;
         }
 
@@ -1062,6 +1067,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             // Fix old block types that might have been marked required but not visible by default.
             //
             blockTypes.Where( b => b.Required ).ToList().ForEach( b => b.DefaultVisible = true );
+
+            //
+            // Sort the list of block types to be alphabetical.
+            //
+            blockTypes = blockTypes.OrderBy( b => b.BlockCache.Name ).ToList();
 
             var page = new PageService( new RockContext() ).Get( GetAttributeValue( "SourcePage" ).AsGuid() );
 
