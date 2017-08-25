@@ -290,6 +290,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         private void BuildPersonControls()
         {
             lbPersonSelectAdd.Visible = !string.IsNullOrWhiteSpace( PageParameter( "RegisterPage" ) );
+            lbPersonSelectAdd.Text = ( !string.IsNullOrWhiteSpace( PageParameter( "RegisterPage" ) ) ).ToString();
+            lbPersonSelectAdd.Visible = true;
 
             //
             // If we have any results then build the link buttons for the user to click.
@@ -319,7 +321,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 if ( !string.IsNullOrEmpty( GetAttributeValue( "RegisterPage" ) ) )
                 {
                     nbNoResults.Text = "There were not any available people found with the search term you entered. You can add yourself using the 'Register' button below.";
-                    lbPersonSelectAdd.Visible = true;
                 }
                 else
                 {
