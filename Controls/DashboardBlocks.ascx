@@ -49,31 +49,53 @@
 
                 <Rock:RockTextBox ID="tbSettingsIconCSSClass" runat="server" Label="Icon CSS Class" Help="The CSS class to use for an icon, such as 'fa fa-tasks'." />
 
-                <Rock:RockRadioButtonList ID="rblSettingsDefaultLayout" runat="server" Label="Default Layout" Help="The column configuration you want users to use by default." RepeatDirection="Horizontal" Required="true" />
+                <Rock:RockControlWrapper ID="cwSettingsLayouts" runat="server" Label="Default Layout" Help="The layout you want users to use by default.">
+                    <asp:Repeater ID="rpSettingsLayouts" runat="server" OnItemCommand="rpSettingsLayouts_ItemCommand" OnItemDataBound="rpSettingsLayouts_ItemDataBound">
+                        <ItemTemplate>
+                            <div class="margin-b-sm">
+                                <asp:RadioButtonList ID="rblSettingsLayout" runat="server" RepeatDirection="Horizontal" />
+                                <asp:LinkButton ID="btnRemoveLayout" runat="server" CssClass="btn btn-xs btn-danger margin-l-sm" CommandName="RemoveLayout"><i class="fa fa-times"></i></asp:LinkButton>
+                            </div>
+                        </ItemTemplate>
+                    </asp:Repeater>
+                </Rock:RockControlWrapper>
+
+                <asp:LinkButton ID="btnSettingsAddLayout" runat="server" CssClass="btn btn-link" Text="Add Layout" OnClick="btnSettingsAddLayout_Click" />
 
                 <Rock:RockControlWrapper ID="cwSettingsBlocks" runat="server" Label="Blocks">
                     <Rock:Grid ID="gSettingsBlocks" runat="server" Title="Blocks" OnGridRebind="gSettingsBlocks_GridRebind" RowStyle-CssClass="js-block-row">
                         <Columns>
                             <asp:BoundField DataField="BlockId" HeaderStyle-CssClass="hidden" ItemStyle-CssClass="hidden" />
+
                             <asp:BoundField DataField="BlockCache.Name" HeaderText="Block" />
+
                             <Rock:RockTemplateField HeaderText="Required" ItemStyle-CssClass="grid-select-field">
                                 <ItemTemplate>
                                     <Rock:RockCheckBox ID="cbRequired" runat="server" Checked='<%# Eval("Required") %>' CssClass="js-block-required" />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
+
                             <Rock:RockTemplateField HeaderText="Visible By Default" ItemStyle-CssClass="grid-select-field">
                                 <ItemTemplate>
                                     <Rock:RockCheckBox ID="cbVisibleByDefault" runat="server" Checked='<%# Eval("DefaultVisible") %>' CssClass="js-block-default" />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
+
+                            <Rock:RockTemplateField HeaderText="Default Row" ItemStyle-HorizontalAlign="Center">
+                                <ItemTemplate>
+                                    <Rock:NumberUpDown ID="nudDefaultRow" runat="server" CssClass="input-sm js-block-position" Required="false" Minimum="0" Maximum="99" Value='<%# Eval("DefaultRow") %>' />
+                                </ItemTemplate>
+                            </Rock:RockTemplateField>
+
                             <Rock:RockTemplateField HeaderText="Default Column" ItemStyle-HorizontalAlign="Center">
                                 <ItemTemplate>
                                     <Rock:NumberUpDown ID="nudDefaultColumn" runat="server" CssClass="input-sm js-block-position" Required="false" Minimum="0" Maximum="4" Value='<%# Eval("DefaultColumn") %>' />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
+
                             <Rock:RockTemplateField HeaderText="Default Order" ItemStyle-HorizontalAlign="Center">
                                 <ItemTemplate>
-                                    <Rock:NumberUpDown ID="nudDefaultOrder" runat="server" CssClass="input-sm js-block-position" Required="false" Minimum="0" Maximum="999" Value='<%# Eval("DefaultOrder") %>' />
+                                    <Rock:NumberUpDown ID="nudDefaultOrder" runat="server" CssClass="input-sm js-block-position" Required="false" Minimum="0" Maximum="99" Value='<%# Eval("DefaultOrder") %>' />
                                 </ItemTemplate>
                             </Rock:RockTemplateField>
                         </Columns>

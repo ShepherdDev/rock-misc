@@ -53,6 +53,19 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
         private bool OptionsCanDeleteLayout;
 
+        private List<string> SettingsLayouts
+        {
+            get
+            {
+                return ViewState["SettingsLayouts"] as List<string>;
+            }
+            set
+            {
+                ViewState["SettingsLayouts"] = value;
+            }
+        }
+        private bool SettingsCanDeleteLayout;
+
         /// <summary>
         /// The list of available blocks as they are being edited in the settings modal.
         /// </summary>
@@ -94,7 +107,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             //
             // Setup any parts of the UI that need to be configured at page initialization.
             //
-            SetupLayoutButtonList( rblSettingsDefaultLayout );
             gSettingsBlocks.ShowActionRow = false;
             gSettingsBlocks.AllowPaging = false;
 
@@ -610,7 +622,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             if ( blockType.Required || blockType.DefaultVisible )
             {
-                block.Config.Column = blockType.DefaultColumn;
+                block.Config.Row = blockType.DefaultRow < rows.Count ? blockType.DefaultRow : 0;
+                columns = rows[block.Config.Row];
+                block.Config.Column = blockType.DefaultColumn < columns.Count ? blockType.DefaultColumn : 0;
                 block.Config.Order = blockType.DefaultOrder;
             }
             else
@@ -724,7 +738,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                 if ( config == null )
                 {
-                    config = new DashboardConfig { Layouts = new List<string> { GetAttributeValue( "DefaultLayout" ) } };
+                    config = new DashboardConfig { Layouts = GetAttributeValues( "DefaultLayout" ) };
                 }
                 
                 //
@@ -738,7 +752,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
             catch
             {
-                config = new DashboardConfig { Layouts = new List<string> { GetAttributeValue( "DefaultLayout" ) } };
+                config = new DashboardConfig { Layouts = GetAttributeValues( "DefaultLayout" ) };
             }
 
             return config;
@@ -790,6 +804,32 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
 
         /// <summary>
+        /// Read the current layout selection that the admin has made in the repeater.
+        /// </summary>
+        private void ReadSettingsLayoutSelection()
+        {
+            List<string> layouts = new List<string>();
+
+            foreach ( RepeaterItem row in rpSettingsLayouts.Controls )
+            {
+                var rblSettingsLayout = row.FindControl( "rblSettingsLayout" ) as RadioButtonList;
+                layouts.Add( rblSettingsLayout.SelectedValue );
+            }
+
+            SettingsLayouts = layouts;
+        }
+
+        /// <summary>
+        /// Bind the layout repeater so the admin can pick which layouts they want to use.
+        /// </summary>
+        private void BindSettingsLayoutOptions()
+        {
+            SettingsCanDeleteLayout = SettingsLayouts.Count > 1;
+            rpSettingsLayouts.DataSource = SettingsLayouts;
+            rpSettingsLayouts.DataBind();
+        }
+
+        /// <summary>
         /// Read the available block type information from the grid.
         /// </summary>
         protected void ReadAvailableBlockTypes()
@@ -806,12 +846,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 var blockId = row.Cells[0].Text.AsInteger();
                 var cbRequired = row.FindControl( "cbRequired" ) as CheckBox;
                 var cbDefaultVisible = row.FindControl( "cbVisibleByDefault" ) as CheckBox;
+                var nudDefaultRow = row.FindControl( "nudDefaultRow" ) as NumberUpDown;
                 var nudDefaultColumn = row.FindControl( "nudDefaultColumn" ) as NumberUpDown;
                 var nudDefaultOrder = row.FindControl( "nudDefaultOrder" ) as NumberUpDown;
 
                 var blockType = blockTypes.Where( b => b.BlockId == blockId ).First();
                 blockType.Required = cbRequired.Checked;
                 blockType.DefaultVisible = cbDefaultVisible.Checked;
+                blockType.DefaultRow = nudDefaultRow.Value;
                 blockType.DefaultColumn = nudDefaultColumn.Value;
                 blockType.DefaultOrder = nudDefaultOrder.Value;
             }
@@ -1027,10 +1069,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             tbSettingsTitle.Text = GetAttributeValue( "Title" );
             tbSettingsIconCSSClass.Text = GetAttributeValue( "IconCSSClass" );
 
-            rblSettingsDefaultLayout.SelectedValue = GetAttributeValue( "DefaultLayout" );
+            SettingsLayouts = GetAttributeValues( "DefaultLayout" );
 
             AvailableBlocksLive = blockTypes;
             BindSettingsBlocks();
+            BindSettingsLayoutOptions();
 
             mdlSettings.Show();
         }
@@ -1043,6 +1086,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         protected void mdlSettings_SaveClick( object sender, EventArgs e )
         {
             ReadAvailableBlockTypes();
+            ReadSettingsLayoutSelection();
             var blockTypes = AvailableBlocksLive;
 
             var page = PageCache.Read( ppSettingsSourcePage.SelectedValueAsId().Value );
@@ -1050,7 +1094,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             SetAttributeValue( "Title", tbSettingsTitle.Text );
             SetAttributeValue( "IconCSSClass", tbSettingsIconCSSClass.Text );
 
-            SetAttributeValue( "DefaultLayout", rblSettingsDefaultLayout.SelectedValue );
+            SetAttributeValue( "DefaultLayout", string.Join( ",", SettingsLayouts ) );
             SetAttributeValue( "AvailableBlocks", JsonConvert.SerializeObject( blockTypes ) );
             SaveAttributeValues();
 
@@ -1121,6 +1165,60 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             BindSettingsBlocks();
         }
 
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void btnSettingsAddLayout_Click( object sender, EventArgs e )
+        {
+            ReadSettingsLayoutSelection();
+
+            var layouts = SettingsLayouts;
+            layouts.Add( THREE_COLUMN );
+            SettingsLayouts = layouts;
+
+            BindSettingsLayoutOptions();
+        }
+
+        /// <summary>
+        /// Handles the ItemCommand event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RepeaterItemEventArgs"/> instance containing the event data.</param>
+        protected void rpSettingsLayouts_ItemCommand( object source, RepeaterCommandEventArgs e )
+        {
+            ReadSettingsLayoutSelection();
+
+            if ( e.CommandName == "RemoveLayout" )
+            {
+                int index = e.CommandArgument.ToString().AsInteger();
+
+                var layouts = SettingsLayouts;
+                layouts.RemoveAt( index );
+                SettingsLayouts = layouts;
+            }
+
+            BindSettingsLayoutOptions();
+        }
+
+        /// <summary>
+        /// Handles the ItemDataBound event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RepeaterItemEventArgs"/> instance containing the event data.</param>
+        protected void rpSettingsLayouts_ItemDataBound( object sender, RepeaterItemEventArgs e )
+        {
+            var layout = ( string ) e.Item.DataItem;
+            var rblSettingsLayout = e.Item.FindControl( "rblSettingsLayout" ) as RadioButtonList;
+            var btnRemoveLayout = e.Item.FindControl( "btnRemoveLayout" ) as LinkButton;
+
+            SetupLayoutButtonList( rblSettingsLayout );
+            rblSettingsLayout.SelectedValue = layout;
+            btnRemoveLayout.Visible = SettingsCanDeleteLayout;
+            btnRemoveLayout.CommandArgument = e.Item.ItemIndex.ToString();
+        }
+
         #endregion
 
         #region Classes
@@ -1152,6 +1250,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             /// True if the block is visible by default for a new user.
             /// </summary>
             public bool DefaultVisible { get; set; }
+
+            /// <summary>
+            /// The default row to place this block if the user does not already have it on screen.
+            /// </summary>
+            public int DefaultRow { get; set; }
 
             /// <summary>
             /// The default column to place this block if the user does not already have it on screen.
