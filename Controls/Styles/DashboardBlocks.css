@@ -10,24 +10,23 @@
 }
 
 /* Makes blocks that contain panels look nicer. */
-.dashboard-panel-block > .panel > .panel-body > .block-content > div > .panel:first-of-type {
+.dashboard-panel-block > .panel > .panel-body > .block-content > div > .panel:first-of-type,
+.dashboard-panel-block > .panel > .panel-body > .block-content > div > div:not(.panel) > .panel:first-of-type {
     border: 0px;
 }
 .dashboard-panel-block > .panel > .panel-body {
     padding: 0px;
 }
 .dashboard-panel-block > .panel > .panel-body > .block-content > div > .panel:last-of-type,
-.dashboard-panel-block > .panel > .panel-body > .block-content > div > div > .grid {
+.dashboard-panel-block > .panel > .panel-body > .block-content > div > div > .grid,
+.dashboard-panel-block > .panel > .panel-body > .block-content > div > div:not(.panel) > .panel:last-of-type,
+.dashboard-panel-block > .panel > .panel-body > .block-content > div > div:not(.panel) > div > .grid {
     margin-bottom: 0px;
 }
 
 /* Hides the first panel title of an embedded dashboard block. */
-.dashboard-panel-hide-title > .panel > .panel-body > .block-content > div > .panel:first-of-type > .panel-heading {
-    padding-top: 0px;
-    padding-bottom: 0px;
-    border-bottom: 0px;
-}
-.dashboard-panel-hide-title > .panel > .panel-body > .block-content > div > .panel:first-of-type > .panel-heading .panel-title {
+.dashboard-panel-hide-title > .panel > .panel-body > .block-content > div > .panel:first-of-type > .panel-heading,
+.dashboard-panel-hide-title > .panel > .panel-body > .block-content > div > div:not(.panel) > .panel:first-of-type > .panel-heading {
     display: none;
 }
 
