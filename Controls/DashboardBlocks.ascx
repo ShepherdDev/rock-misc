@@ -38,6 +38,10 @@
                 <Rock:RockCheckBoxList ID="cblOptionsBlocks" runat="server" Label="Widgets" Help="Which widgets are visible on your dashboard." RepeatDirection="Vertical" />
 
                 <Rock:NotificationBox ID="nbOptionsRequiredBlocks" runat="server" NotificationBoxType="Info"></Rock:NotificationBox>
+
+                <asp:LinkButton ID="lbOptionsResetConfig" runat="server" OnClick="lbOptionsResetConfig_Click" CssClass="btn btn-danger" OnClientClick="event.preventDefault(); Rock.dialogs.confirm('This will completely reset your dashboard, are you sure?', function (shouldContinue) { if (shouldContinue) { var postbackJs = event.target.href ? event.target.href : event.target.parentElement.href; window.location = postbackJs; } });">
+                    <i class="fa fa-recycle"></i> Reset Dashboard
+                </asp:LinkButton>
             </Content>
         </Rock:ModalDialog>
 

@@ -1229,6 +1229,18 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             btnRemoveLayout.CommandArgument = e.Item.ItemIndex.ToString();
         }
 
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void lbOptionsResetConfig_Click( object sender, EventArgs e )
+        {
+            var config = new DashboardConfig { Layouts = GetAttributeValues( "DefaultLayout" ) };
+            SaveConfig( config );
+            NavigateToPage( CurrentPageReference );
+        }
+
         #endregion
 
         #region Classes
