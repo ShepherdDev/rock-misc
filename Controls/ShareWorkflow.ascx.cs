@@ -148,7 +148,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             Page.EnableViewState = false;
             Page.Response.Clear();
             Page.Response.ContentType = "application/json";
-            Page.Response.AppendHeader( "Content-Disposition", string.Format( "attachment; filename={0}_{1}.json" , workflowType.Name.MakeValidFileName(), RockDateTime.Now.ToString( "yyyyMMddHHmm" ) ) );
+            Page.Response.AppendHeader( "Content-Disposition", string.Format( "attachment; filename=\"{0}_{1}.json\"" , workflowType.Name.MakeValidFileName(), RockDateTime.Now.ToString( "yyyyMMddHHmm" ) ) );
             Page.Response.Write( Newtonsoft.Json.JsonConvert.SerializeObject( container ) );
             Page.Response.Flush();
             Page.Response.End();
@@ -2067,7 +2067,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export.Processors
         {
             int entityId;
 
-            if ( entity.EntityTypeQualifierColumn.EndsWith( "Id" ) && int.TryParse( entity.EntityTypeQualifierValue, out entityId ) )
+            if ( entity.EntityTypeQualifierColumn != null && entity.EntityTypeQualifierColumn.EndsWith( "Id" ) && int.TryParse( entity.EntityTypeQualifierValue, out entityId ) )
             {
                 var entityType = helper.FindEntityType( entity.EntityType.Name );
 
