@@ -473,7 +473,15 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
 
                         if ( entity == null )
                         {
-                            entity = helper.CreateNewEntity( encodedEntity );
+                            try
+                            {
+                                entity = helper.CreateNewEntity( encodedEntity );
+                            }
+                            catch ( Exception e )
+                            {
+                                throw new Exception( String.Format( "Error importing encoded entity: {0}", encodedEntity.ToJson() ), e );
+                            }
+
                             messages.Add( string.Format( "Created: {0}, {1}", encodedEntity.EntityType, entityGuid ) );
                         }
                     }
@@ -485,7 +493,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
                 catch ( Exception e )
                 {
                     transaction.Rollback();
-                    messages.Add( e.Message );
+
+                    for ( Exception ex = e; ex != null; ex = ex.InnerException )
+                    {
+                        messages.Add( e.Message );
+                    }
 
                     return false;
                 }
