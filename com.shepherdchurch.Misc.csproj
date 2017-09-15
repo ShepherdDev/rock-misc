@@ -82,6 +82,8 @@
     <Compile Include="DataSelect\LavaPropertySelect.cs" />
     <Compile Include="DataSelect\PersonLavaPropertySelect.cs" />
     <Compile Include="DataSelect\ScheduleSelect.cs" />
+    <Compile Include="Follow\PersonEnteredEra.cs" />
+    <Compile Include="Follow\PersonExitedEra.cs" />
     <Compile Include="Grid\LavaBoundField.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rest\Blocks.cs" />
