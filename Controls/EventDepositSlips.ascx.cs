@@ -63,8 +63,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             {
                 SetFilter();
 
-                btnPrint_Click( this, null );
-//                BindPaymentsGrid();
+                BindPaymentsGrid();
             }
         }
 
