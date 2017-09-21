@@ -100,9 +100,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             {
                 using ( var rockContext = new RockContext() )
                 {
-                    var currencyTypes = new Dictionary<int, string>();
-                    var creditCardTypes = new Dictionary<int, string>();
-
                     // If configured for a registration and registration is null, return
                     int registrationEntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.Registration ) ).Id;
 
@@ -141,6 +138,15 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     {
                         DateTime upperDate = drp.UpperValue.Value.Date.AddDays( 1 );
                         qry = qry.Where( t => t.TransactionDateTime < upperDate );
+                    }
+
+                    //
+                    // Filter by currency type.
+                    //
+                    var currencyTypes = fPayments.GetUserPreference( "Currency Type" ).SplitDelimitedValues().AsIntegerList();
+                    if ( currencyTypes.Any() )
+                    {
+                        qry = qry.Where( t => t.FinancialPaymentDetail.CurrencyTypeValueId.HasValue && currencyTypes.Contains( t.FinancialPaymentDetail.CurrencyTypeValueId.Value ) );
                     }
 
                     SortProperty sortProperty = gPayments.SortProperty;
