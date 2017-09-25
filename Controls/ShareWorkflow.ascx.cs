@@ -443,6 +443,16 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
             messages = new List<string>();
             var helper = new Helper( rockContext );
 
+            //
+            // Ensure we know about all referenced entity types.
+            //
+            var missingTypes = container.MissingEntityTypes();
+            if ( missingTypes.Any() )
+            {
+                messages.Add( string.Format( "The following EntityTypes are unknown and indicate you may be missing a plug-in: <ul><li>{0}</li></ul>", string.Join( "</li><li>", missingTypes ) ) );
+                return false;
+            }
+
             using ( var transaction = rockContext.Database.BeginTransaction() )
             {
                 try
@@ -1771,6 +1781,52 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
         {
             Entities = new List<EncodedEntity>();
             RootEntities = new List<Guid>();
+        }
+
+        /// <summary>
+        /// Check for any missing entity types that would be encountered during an import
+        /// operation.
+        /// </summary>
+        /// <returns>A list of strings that identify the missing entity type class names.</returns>
+        public List<string> MissingEntityTypes()
+        {
+            //
+            // Ensure we know about all referenced entity types.
+            //
+            var missingTypes = new List<string>();
+
+            //
+            // Get all the explicit EntityTypes for entities that are to be imported.
+            //
+            var entityTypeStrings = Entities.Select( e => e.EntityType ).ToList();
+
+            //
+            // Check for GUID and EntityType references.
+            //
+            var references = Entities.SelectMany( e => e.References );
+
+            entityTypeStrings.AddRange( references
+                .Where( r => r.Type == ReferenceType.Guid )
+                .Select( r => r.EntityType ) );
+
+            entityTypeStrings.AddRange( references
+                .Where( r => r.Type == ReferenceType.EntityType )
+                .Select( r => ( string ) r.Data ) );
+
+            //
+            // Just check the unique ones.
+            //
+            entityTypeStrings = entityTypeStrings.Distinct().ToList();
+
+            foreach ( var entityType in entityTypeStrings )
+            {
+                if ( EntityTypeCache.Read( entityType, false, null ) == null )
+                {
+                    missingTypes.Add( entityType );
+                }
+            }
+
+            return missingTypes;
         }
 
         #endregion
