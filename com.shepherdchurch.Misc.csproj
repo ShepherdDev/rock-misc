@@ -61,6 +61,7 @@
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data.Linq" />
     <Reference Include="System.Runtime.Caching" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Web" />
@@ -82,6 +83,7 @@
     <Compile Include="DataSelect\LavaPropertySelect.cs" />
     <Compile Include="DataSelect\PersonLavaPropertySelect.cs" />
     <Compile Include="DataSelect\ScheduleSelect.cs" />
+    <Compile Include="DataTransform\IncludeSpouseTransform.cs" />
     <Compile Include="Follow\PersonEnteredEra.cs" />
     <Compile Include="Follow\PersonExitedEra.cs" />
     <Compile Include="Grid\LavaBoundField.cs" />
