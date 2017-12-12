@@ -58,6 +58,49 @@ namespace com.shepherdchurch.Misc.Rest
                 blockGuid );
         }
 
+        /// <summary>
+        /// Retrieve the JS from the SQL query and Lava Template in the block.
+        /// </summary>
+        /// <param name="blockGuid">The GUID that identifies the block to run this query for.</param>
+        /// <returns>An HTML formatted string.</returns>
+        [HttpGet]
+        [System.Web.Http.Route( "api/SC_Misc_Blocks/GetJavascriptForSqlBlock/{blockGuid}" )]
+        public IEnumerable<Dictionary<string, object>> GetJavascriptForSqlBlock( Guid blockGuid )
+        {
+            RockContext rockContext = new RockContext();
+            Block block = new BlockService( rockContext ).Get( blockGuid );
+
+            if ( block != null )
+            {
+                block.LoadAttributes();
+
+                string sql = block.GetAttributeValue( "Sql" );
+
+                var parameters = ActionContext.Request.GetQueryStrings()
+                    .AsQueryable()
+                    .ToDictionary( x => x.Key, x => ( object ) x.Value );
+
+                var results = DbService.GetDataSet( sql.ToString(), CommandType.Text, parameters, null );
+
+                var rows = new List<Dictionary<string, object>>();
+                foreach ( DataRow row in results.Tables[0].Rows )
+                {
+                    var r = new Dictionary<string, object>();
+
+                    foreach ( DataColumn column in results.Tables[0].Columns )
+                    {
+                        r.Add( column.ColumnName, row[column] );
+                    }
+
+                    rows.Add( r );
+                }
+
+                return rows;
+            }
+
+            return null;
+        }
+
         #endregion
 
         #region Classes
