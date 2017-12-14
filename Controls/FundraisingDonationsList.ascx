@@ -9,19 +9,14 @@
 
             <div class="panel-body">
                 <div class="grid grid-panel">
-                    <Rock:Grid ID="gDonations" runat="server" DisplayType="Full" AllowSorting="true" EmptyDataText="No Donations Found" PersonIdField="DonorId" RowItemText="Donations" DataKeyNames="DonorId">
+                    <Rock:Grid ID="gDonations" runat="server" DisplayType="Full" AllowSorting="true" EmptyDataText="No Donations Found" PersonIdField="DonorId" RowItemText="Donations" DataKeyNames="DonorId" ExportSource="ColumnOutput" >
                         <Columns>
                             <Rock:SelectField />
-                            <Rock:PersonField DataField="Donor" HeaderText="Donor" SortExpression="Donor.LastName, Donor.NickName" />
-                            <Rock:RockBoundField DataField="Address" HeaderText="Donor Address" HtmlEncode="false" />
-                            <Rock:RockBoundField DataField="Donor.Email" HeaderText="Donor Email" SortExpression="Donor.Email" />
-                            <Rock:RockTemplateField  HeaderText="Participant" SortExpression="Participant.Person.LastName, Participant.Person.NickName">
-                                <ItemTemplate>
-                                    <a href="/Person/<%# Eval( "Participant.Person.Id" ) %>" class="pull-right margin-l-sm btn btn-sm btn-default"><i class="fa fa-user"></i></a>
-                                    <a href="/GroupMember/<%# Eval( "Participant.Id" ) %>"><%# Eval( "Participant.Person.FullName" ) %></a>
-                                </ItemTemplate>
-                            </Rock:RockTemplateField>
-                            <Rock:DateField DataField="Date" HeaderText="Date" HeaderStyle-HorizontalAlign="Right" SortExpression="Date" />
+                            <Rock:RockBoundField DataField="DonorName" HeaderText="Donor" SortExpression="Donor.LastName, Donor.NickName" HtmlEncode="false" />
+                            <Rock:RockBoundField DataField="Address" HeaderText="Donor Address" HtmlEncode="false" ExcelExportBehavior="IncludeIfVisible" />
+                            <Rock:RockBoundField DataField="Email" HeaderText="Donor Email" SortExpression="Email" ExcelExportBehavior="IncludeIfVisible" />
+                            <Rock:RockBoundField DataField="ParticipantName" HeaderText="Participant" SortExpression="Participant.Person.LastName, Participant.Person.NickName" HtmlEncode="false" />
+                            <Rock:DateField DataField="Date" HeaderText="Date" HeaderStyle-HorizontalAlign="Right" SortExpression="Date" ExcelExportBehavior="AlwaysInclude" />
                             <Rock:CurrencyField DataField="Amount" HeaderText="Amount" HeaderStyle-HorizontalAlign="Right" SortExpression="Amount" />
                         </Columns>
                     </Rock:Grid>
