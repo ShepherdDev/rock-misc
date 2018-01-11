@@ -27,6 +27,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     {
         static private object _lockObject = new Object();
 
+        protected CookieContainer CookieContainer = null;
+        protected string Csrft = null;
+
         protected void Page_Load( object sender, EventArgs e )
         {
             if ( !IsPostBack )
@@ -98,9 +101,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             //
             // Replace the cookie container in cache.
             //
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
-            cache.Remove( "com.shepherdchurch.s2control_cookies" );
-            cache.Add( "com.shepherdchurch.s2control_cookies", webRequest.CookieContainer, new System.Runtime.Caching.CacheItemPolicy() );
+            CookieContainer = webRequest.CookieContainer;
 
             //
             // Request the standard home page so we can get the CSRFT variable.
@@ -109,8 +110,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             var match = Regex.Match( content, "csrft\\s*=\\s*\"([^\"]+)\"", RegexOptions.Multiline );
             if ( match != null && match.Success )
             {
-                cache.Remove( "com.shepherdchurch.s2control_csrft" );
-                cache.Add( "com.shepherdchurch.s2control_csrft", match.Groups[1].Value, new System.Runtime.Caching.CacheItemPolicy() );
+                Csrft = match.Groups[1].Value;
                 return;
             }
 
@@ -132,8 +132,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             var webRequest = ( HttpWebRequest ) WebRequest.Create( url );
             webRequest.Timeout = 5000;
 
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
-            webRequest.CookieContainer = ( CookieContainer ) cache.Get( "com.shepherdchurch.s2control_cookies" );
+            webRequest.CookieContainer = CookieContainer;
 
             try
             {
@@ -159,8 +158,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             webRequest.Method = "POST";
             webRequest.ContentType = "application/x-www-form-urlencoded";
 
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
-            webRequest.CookieContainer = ( CookieContainer ) cache.Get( "com.shepherdchurch.s2control_cookies" );
+            webRequest.CookieContainer = CookieContainer;
 
             //
             // Write the POST data.
@@ -272,13 +270,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <returns>True if the command was successful, false otherwise.</returns>
         protected bool ProcessLockCommand()
         {
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
-
             Login();
 
             string url = string.Format( "http://{0}/threatLevel/change/insert/", GetAttributeValue( "Address" ) );
             string post = string.Format( "csrft={0}&json={{\"password\":\"{1}\",\"threatLevel\":{2},\"location\":{3},\"applytosublocations\":false}}",
-                cache["com.shepherdchurch.s2control_csrft"],
+                Csrft,
                 GetPassword(),
                 GetAttributeValue( "LockThreatLevel" ),
                 Request.QueryString["id"] );
@@ -294,13 +290,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <returns>True if the command was successful, false otherwise.</returns>
         protected object ProcessUnlockCommand()
         {
-            var cache = Rock.Web.Cache.RockMemoryCache.Default;
-
             Login();
 
             string url = string.Format( "http://{0}/threatLevel/change/insert/", GetAttributeValue( "Address" ) );
             string post = string.Format( "csrft={0}&json={{\"password\":\"{1}\",\"threatLevel\":{2},\"location\":{3},\"applytosublocations\":false}}",
-                cache["com.shepherdchurch.s2control_csrft"],
+                Csrft,
                 GetPassword(),
                 GetAttributeValue( "UnlockThreatLevel" ),
                 Request.QueryString["id"] );
