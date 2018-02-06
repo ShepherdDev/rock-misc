@@ -50,6 +50,9 @@
       <HintPath>..\RockWeb\Bin\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Quartz">
+      <HintPath>..\RockWeb\Bin\Quartz.dll</HintPath>
+    </Reference>
     <Reference Include="Rock">
       <HintPath>..\RockWeb\Bin\Rock.dll</HintPath>
       <Private>False</Private>
@@ -84,6 +87,10 @@
     <Compile Include="DataSelect\PersonLavaPropertySelect.cs" />
     <Compile Include="DataSelect\ScheduleSelect.cs" />
     <Compile Include="DataTransform\IncludeSpouseTransform.cs" />
+    <Compile Include="Jobs\CalculateEngagement.cs" />
+    <Compile Include="UI\Controls\MaskedAddressControl.cs" />
+    <Compile Include="UI\Controls\MaskedEmailBox.cs" />
+    <Compile Include="UI\Controls\MaskedPhoneNumberBox.cs" />
     <Compile Include="Follow\PersonEnteredEra.cs" />
     <Compile Include="Follow\PersonExitedEra.cs" />
     <Compile Include="Grid\LavaBoundField.cs" />
