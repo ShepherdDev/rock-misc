@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data.Entity;
 using System.Linq;
 using System.Linq.Dynamic;
 using System.Web.UI;
@@ -76,7 +77,19 @@ namespace Plugins.com_shepherdchurch.Misc
             //
             // Only show the panel and content if the group type is a fundraising opportunity.
             //
-            if ( group != null && group.GroupTypeId == GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FUNDRAISINGOPPORTUNITY.AsGuid() ).Id )
+            List<int> groupTypeIds = new List<int>();
+            using ( var rockContext = new RockContext() )
+            {
+                var groupTypeService = new GroupTypeService( rockContext );
+                var groupType = groupTypeService.Get( Rock.SystemGuid.GroupType.GROUPTYPE_FUNDRAISINGOPPORTUNITY.AsGuid() );
+
+                if ( groupType != null )
+                {
+                    groupTypeIds = GetDescendantInheritedGroupTypeIds( groupType.Id );
+                }
+            }
+
+            if ( group != null && groupTypeIds.Contains( group.GroupTypeId ) )
             {
                 pnlDetails.Visible = true;
                 BindGrid();
@@ -179,6 +192,36 @@ namespace Plugins.com_shepherdchurch.Misc
         private void gDonations_GridRebind( object sender, Rock.Web.UI.Controls.GridRebindEventArgs e )
         {
             BindGrid();
+        }
+
+        #endregion
+
+        #region Required Until Added To Core
+
+        /// <summary>
+        /// Gets a list of GroupType Ids, including our own Id, that identifies the
+        /// inheritence tree.
+        /// </summary>
+        /// <param name="groupTypeGuid">The parent group type Id to start from.</param>
+        /// <returns>A list of GroupType Ids, including our own Id, that identifies the inheritence tree.</returns>
+        public List<int> GetDescendantInheritedGroupTypeIds( int groupTypeId )
+        {
+            var rockContext = new RockContext();
+
+            var groupTypeService = new GroupTypeService( rockContext );
+
+            return groupTypeService.ExecuteQuery( @"
+				WITH CTE AS (
+		            SELECT [Id],[InheritedGroupTypeId] FROM [GroupType] WHERE [Id] = {0}
+		            UNION ALL
+		            SELECT [a].[Id],[a].[InheritedGroupTypeId] FROM [GroupType] [a]
+		            JOIN CTE acte ON acte.[Id] = [a].[InheritedGroupTypeId]
+                 )
+                SELECT *
+                FROM [GroupType]
+                WHERE [Id] IN ( SELECT [Id] FROM CTE )", groupTypeId )
+                .Select( t => t.Id )
+                .ToList();
         }
 
         #endregion
