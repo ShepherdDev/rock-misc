@@ -5,6 +5,7 @@ using System.Linq;
 using System.Web.UI.WebControls;
 
 using Rock;
+using Rock.Attribute;
 using Rock.Data;
 using Rock.Model;
 using Rock.Web.Cache;
@@ -16,6 +17,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
     [Category( "Shepherd Church > Misc" )]
     [Description( "Allows you to convert a Person record into a Business and vice-versa." )]
 
+    [DefinedValueField( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS, "Default Connection Status", "The default connection status to use when converting a business to a person.", false, order: 0 )]
     public partial class ConvertBusiness : RockBlock
     {
         #region Base Method Overrides
@@ -60,6 +62,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void Block_BlockUpdated( object sender, EventArgs e )
         {
+            pnlToBusiness.Visible = false;
+            pnlToPerson.Visible = false;
+            ppSource.SetValue( null );
         }
 
         /// <summary>
@@ -85,6 +90,19 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     tbPersonFirstName.Text = string.Empty;
                     tbPersonLastName.Text = person.LastName;
                     dvpPersonConnectionStatus.DefinedTypeId = DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS.AsGuid() ).Id;
+                    dvpMaritalStatus.DefinedTypeId = DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.PERSON_MARITAL_STATUS.AsGuid() ).Id;
+                    rblGender.BindToEnum<Gender>();
+
+                    rblGender.SetValue( Gender.Unknown.ConvertToInt() );
+
+                    if ( !string.IsNullOrWhiteSpace( GetAttributeValue( "DefaultConnectionStatus" ) ) )
+                    {
+                        var dv = DefinedValueCache.Read( GetAttributeValue( "DefaultConnectionStatus" ).AsGuid() );
+                        if ( dv != null )
+                        {
+                            dvpPersonConnectionStatus.SetValue( dv.Id );
+                        }
+                    }
                 }
                 else
                 {
@@ -148,6 +166,12 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             History.EvaluateChange( changes, "Last Name", person.LastName, tbPersonLastName.Text.Trim() );
             person.LastName = tbPersonLastName.Text.Trim();
 
+            History.EvaluateChange( changes, "Gender", person.Gender, rblGender.SelectedValueAsEnum<Gender>() );
+            person.Gender = rblGender.SelectedValueAsEnum<Gender>();
+
+            History.EvaluateChange( changes, "Marital Status", DefinedValueCache.GetName( person.MaritalStatusValueId ), DefinedValueCache.GetName( dvpMaritalStatus.SelectedValueAsId() ) );
+            person.MaritalStatusValueId = dvpMaritalStatus.SelectedValueAsId();
+
             context.SaveChanges();
             if ( changes.Count > 0 )
             {
@@ -155,8 +179,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
 
             ppSource.SetValue( null );
-            nbSuccess.Text = string.Format( "{0} has been converted to a person.", person.FullName );
 
+            var parameters = new Dictionary<string, string>
+            {
+                { "PersonId", person.Id.ToString() }
+            };
+            var pageRef = new Rock.Web.PageReference( Rock.SystemGuid.Page.PERSON_PROFILE_PERSON_PAGES, parameters );
+            nbSuccess.Text = string.Format( "<a href='{1}'>{0}</a> has been converted to a person.", person.FullName, pageRef.BuildUrl() );
+            
             pnlToPerson.Visible = false;
         }
 
@@ -265,9 +295,37 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             }
 
             ppSource.SetValue( null );
-            nbSuccess.Text = string.Format( "{0} has been converted to a business.", person.LastName );
+
+            var parameters = new Dictionary<string, string>
+            {
+                { "BusinessId", person.Id.ToString() }
+            };
+            var pageRef = new Rock.Web.PageReference( Rock.SystemGuid.Page.BUSINESS_DETAIL, parameters );
+            nbSuccess.Text = string.Format( "<a href='{1}'>{0}</a> has been converted to a business.", person.LastName, pageRef.BuildUrl() );
 
             pnlToBusiness.Visible = false;
+        }
+
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void lbPersonCancel_Click( object sender, EventArgs e )
+        {
+            pnlToPerson.Visible = false;
+            ppSource.SetValue( null );
+        }
+
+        /// <summary>
+        /// Handles the Click event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void lbBusinessCancel_Click( object sender, EventArgs e )
+        {
+            pnlToBusiness.Visible = false;
+            ppSource.SetValue( null );
         }
 
         #endregion
