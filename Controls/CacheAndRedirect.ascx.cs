@@ -79,8 +79,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         void CheckCacheAndRedirect()
         {
             PageReference target;
-            string key = CacheKey();
-            string value;
             int cacheTime = GetAttributeValue( "CacheTime" ).AsInteger();
 
             //
@@ -91,54 +89,65 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 cacheTime = 365 * 24 * 60;
             }
 
-            //
-            // Try to get the value from the URL and then from the cache.
-            //
-            value = PageParameter( GetAttributeValue( "URLKey" ) );
-            if ( string.IsNullOrEmpty( value ) )
-            {
-                value = ( string )_cache[key];
-            }
+            target = new PageReference( GetAttributeValue( "ContentPage" ), new Dictionary<string, string>() );
 
-            if ( !string.IsNullOrEmpty( value ) )
+            foreach ( var urlKey in GetAttributeValues( "URLKey" ) )
             {
+                bool hasValueInUrl = CurrentPageReference.QueryString.AllKeys.Select( s => s.ToLower() ).Contains( urlKey.ToLower() );
+                string key = CacheKey( urlKey );
+                string value = null;
+
                 //
-                // We have a value, save it to the cache.
+                // Try to get the value from the URL and then from the cache.
                 //
-                target = new PageReference( GetAttributeValue( "ContentPage" ), CurrentPageReference.QueryString.AllKeys.ToDictionary( k => k, k => CurrentPageReference.QueryString[k] ) );
-                target.Parameters.AddOrReplace( GetAttributeValue( "URLKey" ), value );
-                _cache.Set( key, value, DateTimeOffset.Now.AddMinutes( cacheTime ) );
-            }
-            else
-            {
-                //
-                // No value. They need to be sent to the Setup Page or the parent page.
-                //
-                if ( !string.IsNullOrEmpty( GetAttributeValue( "SetupPage" ) ) )
+                if ( hasValueInUrl )
                 {
-                    target = new PageReference( GetAttributeValue( "SetupPage" ), CurrentPageReference.QueryString.AllKeys.ToDictionary( k => k, k => CurrentPageReference.QueryString[k] ) );
+                    value = PageParameter( urlKey );
                 }
                 else
                 {
-                    var pageCache = PageCache.Read( RockPage.PageId );
-                    if ( pageCache != null && pageCache.ParentPage != null )
+                    value = ( string ) _cache[key];
+                }
+
+                if ( value == null )
+                {
+                    //
+                    // No value. They need to be sent to the Setup Page or the parent page.
+                    //
+                    if ( !string.IsNullOrEmpty( GetAttributeValue( "SetupPage" ) ) )
                     {
-                        target = new PageReference( pageCache.ParentPage.Guid.ToString(), CurrentPageReference.QueryString.AllKeys.ToDictionary( k => k, k => CurrentPageReference.QueryString[k] ) );
+                        target = new PageReference( GetAttributeValue( "SetupPage" ) );
                     }
                     else
                     {
-                        nbWarning.Text = "No Setup Page was defined and no parent page could be found.";
-                        return;
+                        var pageCache = PageCache.Read( RockPage.PageId );
+                        if ( pageCache != null && pageCache.ParentPage != null )
+                        {
+                            target = new PageReference( pageCache.ParentPage.Guid.ToString() );
+                        }
+                        else
+                        {
+                            nbWarning.Text = "No Setup Page was defined and no parent page could be found.";
+                            return;
+                        }
                     }
+
+                    break;
                 }
+
+                //
+                // We have a value, save it to the cache.
+                //
+                _cache.Set( key, value, DateTimeOffset.Now.AddMinutes( cacheTime ) );
+                target.Parameters.AddOrReplace( urlKey, value );
             }
 
             Redirect( target.BuildUrl() );
         }
 
-        string BlockCacheKey()
+        string BlockCacheKey( string parameter )
         {
-            string key = "com_shepherdchurch_cacheandredirect_" + GetAttributeValue( "URLKey" );
+            string key = "com_shepherdchurch_cacheandredirect_" + parameter;
 
             if ( !string.IsNullOrWhiteSpace( GetAttributeValue( "BlockKey" ) ) )
             {
@@ -152,9 +161,9 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             return key;
         }
 
-        string CacheKey()
+        string CacheKey( string parameter )
         {
-            string key = BlockCacheKey();
+            string key = BlockCacheKey( parameter );
 
             if ( GetAttributeValue( "SessionUnique" ).AsBoolean() == true )
             {
@@ -168,15 +177,25 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         {
             if ( cacheType == "me" )
             {
-                _cache.Remove( CacheKey() );
+                foreach ( var key in GetAttributeValues( "URLKey" ) )
+                {
+                    _cache.Remove( CacheKey( key ) );
+                }
+
                 nbWarning.Text = string.Format(
                     "Your cache key has been cleared. Click <a href=\"{0}\">here</a> to reload the page.",
                     new PageReference( RockPage.PageId ).BuildUrl() );
             }
             else if ( cacheType == "block" )
             {
-                string key = BlockCacheKey();
-                var keys = _cache.Where( kvp => kvp.Key.StartsWith( key ) ).Select( kvp => kvp.Key ).ToList();
+                var keys = new List<string>();
+
+                foreach ( var key in GetAttributeValues( "URLKey" ) )
+                {
+                    string cacheKey = BlockCacheKey( key );
+                    keys.AddRange( _cache.Where( kvp => kvp.Key.StartsWith( cacheKey ) ).Select( kvp => kvp.Key ).ToList() );
+
+                }
 
                 foreach ( var k in keys )
                 {
