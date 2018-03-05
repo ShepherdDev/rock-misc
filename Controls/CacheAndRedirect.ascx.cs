@@ -105,8 +105,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 //
                 // We have a value, save it to the cache.
                 //
-                target = new PageReference( GetAttributeValue( "ContentPage" ) );
-                target.Parameters = new Dictionary<string, string> { { GetAttributeValue( "URLKey" ), value } };
+                target = new PageReference( GetAttributeValue( "ContentPage" ), CurrentPageReference.Parameters );
+                target.Parameters.AddOrReplace( GetAttributeValue( "URLKey" ), value );
                 _cache.Set( key, value, DateTimeOffset.Now.AddMinutes( cacheTime ) );
             }
             else
@@ -116,14 +116,14 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 //
                 if ( !string.IsNullOrEmpty( GetAttributeValue( "SetupPage" ) ) )
                 {
-                    target = new PageReference( GetAttributeValue( "SetupPage" ) );
+                    target = new PageReference( GetAttributeValue( "SetupPage" ), CurrentPageReference.Parameters );
                 }
                 else
                 {
                     var pageCache = PageCache.Read( RockPage.PageId );
                     if ( pageCache != null && pageCache.ParentPage != null )
                     {
-                        target = new PageReference( pageCache.ParentPage.Guid.ToString() );
+                        target = new PageReference( pageCache.ParentPage.Guid.ToString(), CurrentPageReference.Parameters );
                     }
                     else
                     {
