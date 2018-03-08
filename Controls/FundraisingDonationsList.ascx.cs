@@ -31,11 +31,11 @@ namespace Plugins.com_shepherdchurch.Misc
     [BooleanField( "Show Participant Group Member Link", "Determines if the Participant Group Member Link should be displayed in the Donation List.", true, "Participant", order: 8 )]
     [TextField( "Participant Person Link", "The base route that should be used prior to the PersonId.", false, "/Person/", "Participant", order: 9 )]
     [BooleanField( "Show Participant Person Link", "Determines if the Participant Person Link should be displayed in the Donation List.", true, "Participant", order: 10 )]
-    [BooleanField( "Show Communicate", "Show Communicate button in grid footer?", true, "Grid Actions", order: 1 )]
-    [BooleanField( "Show Merge Person", "Show Merge Person button in grid footer?", true, "Grid Actions", order: 2 )]
-    [BooleanField( "Show Bulk Update", "Show Bulk Update button in grid footer?", true, "Grid Actions", order: 3 )]
-    [BooleanField( "Show Excel Export", "Show Export to Excel button in grid footer?", true, "Grid Actions", order: 4 )]
-    [BooleanField( "Show Merge Template", "Show Export to Merge Template button in grid footer?", true, "Grid Actions", order: 5 )]
+    [BooleanField( "Show Communicate", "Show Communicate button in grid footer?", true, "Advanced", order: 1 )]
+    [BooleanField( "Show Merge Person", "Show Merge Person button in grid footer?", true, "Advanced", order: 2 )]
+    [BooleanField( "Show Bulk Update", "Show Bulk Update button in grid footer?", true, "Advanced", order: 3 )]
+    [BooleanField( "Show Excel Export", "Show Export to Excel button in grid footer?", true, "Advanced", order: 4 )]
+    [BooleanField( "Show Merge Template", "Show Export to Merge Template button in grid footer?", true, "Advanced", order: 5 )]
 
     [ContextAware]
     public partial class FundraisingDonationsList : RockBlock
