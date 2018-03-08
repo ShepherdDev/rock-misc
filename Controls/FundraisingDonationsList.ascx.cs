@@ -22,15 +22,15 @@ namespace Plugins.com_shepherdchurch.Misc
     [Description( "Lists donations in a grid for the current fundraising opportunity or participant." )]
 
     [BooleanField( "Show Amount", "Determines if the Amount column should be displayed in the Donation List.", true, order: 1 )]
-    [BooleanField( "Show Donor Person Link", "Determines if the Donor Person Link should be displayed in the Donation List.", true, "Donor", order: 2 )]
-    [TextField( "Donor Person Link", "The base route that should be used with the the Donor Person link.", false, "/Person/", "Donor", order: 3 )]
+    [BooleanField( "Show Donor Person As Link", "Determines if the Donor Person Name should be displayed as a link.", true, "Donor", order: 2 )]
+    [TextField( "Donor Person Link", "The route that should be used for the the Donor Person link. Available merge fields: {DonorPersonId}, {GroupMemberPersonId}, {GroupMemberId}, and {GroupId}", false, "/Person/{DonorPersonId}", "Donor", order: 3 )]
     [BooleanField( "Show Donor Address", "Determines if the Donor's Address should be displayed in the Donation List.", true, "Donor", order: 4 )]
     [BooleanField( "Show Donor Email", "Determines if the Donor's Email should be displayed in the Donation List.", true, "Donor", order: 5 )]
     [BooleanField( "Show Participant Column", "Determines if the Participant column should be displayed in the Donation List.", true, "Participant", order: 6 )]
-    [TextField( "Participant Group Member Link", "The base route that should be used prior to the GroupMemberId. Note: including {GroupId} will include the current GroupId in the url.", false, "/GroupMember/", "Participant", order: 7 )]
-    [BooleanField( "Show Participant Group Member Link", "Determines if the Participant Group Member Link should be displayed in the Donation List.", true, "Participant", order: 8 )]
-    [TextField( "Participant Person Link", "The base route that should be used prior to the PersonId.", false, "/Person/", "Participant", order: 9 )]
-    [BooleanField( "Show Participant Person Link", "Determines if the Participant Person Link should be displayed in the Donation List.", true, "Participant", order: 10 )]
+    [BooleanField( "Show Participant Group Member Link", "Determines if the Participant Group Member Link should be displayed in the Donation List.", true, "Participant", order: 7 )]
+    [TextField( "Participant Group Member Link", "The route that should be used for the Group Member Link. Available merge fields: {DonorPersonId}, {GroupMemberPersonId}, {GroupMemberId}, and {GroupId}", false, "/GroupMember/{GroupMemberId}", "Participant", order: 8 )]
+    [BooleanField( "Show Participant Person Link", "Determines if the Participant Person Link should be displayed in the Donation List.", true, "Participant", order: 9 )]
+    [TextField( "Participant Person Link", "The route that should be used for to the Group Member Person Link. Available merge fields: {DonorPersonId}, {GroupMemberPersonId}, {GroupMemberId}, and {GroupId}", false, "/Person/{GroupMemberPersonId}", "Participant", order: 10 )]
     [BooleanField( "Show Communicate", "Show Communicate button in grid footer?", true, "Advanced", order: 1 )]
     [BooleanField( "Show Merge Person", "Show Merge Person button in grid footer?", true, "Advanced", order: 2 )]
     [BooleanField( "Show Bulk Update", "Show Bulk Update button in grid footer?", true, "Advanced", order: 3 )]
@@ -40,8 +40,9 @@ namespace Plugins.com_shepherdchurch.Misc
     [ContextAware]
     public partial class FundraisingDonationsList : RockBlock
     {
-        public string ParticipantPersonLink = "/Person/";
-        public string ParticipantGroupMemberLink = "/GroupMember/";
+        public string DonorPersonLink = "/Person/{DonorPersonId}";
+        public string ParticipantGroupMemberLink = "/GroupMember/{GroupMemberId}";
+        public string ParticipantPersonLink = "/Person/{GroupMemberPersonId}";
 
         #region Base Method Overrides
 
@@ -82,9 +83,10 @@ namespace Plugins.com_shepherdchurch.Misc
         /// </summary>
         protected void ShowDetails()
         {
+            DonorPersonLink = GetAttributeValue( "DonorPersonLink" );
             ParticipantGroupMemberLink = GetAttributeValue( "ParticipantGroupMemberLink" );
             ParticipantPersonLink = GetAttributeValue( "ParticipantPersonLink" );
-
+            
             var group = ContextEntity<Group>();
             var groupMember = ContextEntity<GroupMember>();
 
@@ -100,9 +102,17 @@ namespace Plugins.com_shepherdchurch.Misc
             //
             if ( group != null && group.GroupTypeId == GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FUNDRAISINGOPPORTUNITY.AsGuid() ).Id )
             {
+                if ( !string.IsNullOrWhiteSpace( DonorPersonLink ) )
+                {
+                    DonorPersonLink = DonorPersonLink.Replace( "{GroupId}", group.Id.ToString() );
+                }
                 if ( !string.IsNullOrWhiteSpace( ParticipantGroupMemberLink ) )
                 {
                     ParticipantGroupMemberLink = ParticipantGroupMemberLink.Replace( "{GroupId}", group.Id.ToString() );
+                }
+                if ( !string.IsNullOrWhiteSpace( ParticipantPersonLink ) )
+                {
+                    ParticipantPersonLink = ParticipantPersonLink.Replace( "{GroupId}", group.Id.ToString() );
                 }
                 pnlDetails.Visible = true;
                 BindGrid();
@@ -145,8 +155,7 @@ namespace Plugins.com_shepherdchurch.Misc
                 gDonations.Columns.OfType<DateField>().Where( c => c.HeaderText == "Date" ).ToList().ForEach( c => c.Visible = true );
             }
 
-            var showDonorPersonLink = GetAttributeValue( "ShowDonorPersonLink" ).AsBoolean();
-            var donorPersonLink = GetAttributeValue( "DonorPersonLink" );
+            var showDonorPersonAsLink = GetAttributeValue( "ShowDonorPersonAsLink" ).AsBoolean();
             var showParticipantPersonLink = GetAttributeValue( "ShowParticipantPersonLink" ).AsBoolean();
             var showParticipantGroupMemberLink = GetAttributeValue( "ShowParticipantGroupMemberLink" ).AsBoolean();
 
@@ -161,13 +170,13 @@ namespace Plugins.com_shepherdchurch.Misc
                 {
                     DonorId = d.Transaction.AuthorizedPersonAlias.PersonId,
                     Donor = d.Transaction.AuthorizedPersonAlias.Person,
-                    DonorName = ( ( isExporting || !showDonorPersonLink ) ? d.Transaction.AuthorizedPersonAlias.Person.FullName : string.Format( "<a href=\"{0}{1}\">{2}</a>", donorPersonLink, d.Transaction.AuthorizedPersonAlias.Person.Id, d.Transaction.AuthorizedPersonAlias.Person.FullName ) ),
+                    DonorName = ( ( isExporting || !showDonorPersonAsLink ) ? d.Transaction.AuthorizedPersonAlias.Person.FullName : string.Format( "<a href=\"{0}\">{1}</a>", DonorPersonLink.Replace( "{DonorPersonId}", d.Transaction.AuthorizedPersonAlias.Person.Id.ToString() ).Replace( "{GroupMemberId}", groupMembers[d.EntityId.Value].Id.ToString() ).Replace( "{GroupMemberPersonId}", groupMembers[d.EntityId.Value].PersonId.ToString() ), d.Transaction.AuthorizedPersonAlias.Person.FullName ) ),
                     Email = d.Transaction.AuthorizedPersonAlias.Person.Email,
                     Participant = groupMembers[d.EntityId.Value],
-                    ParticipantName = ( isExporting ? groupMembers[d.EntityId.Value].Person.FullName :
+                    ParticipantName = ( isExporting ? groupMembers[d.EntityId.Value].Person.FullName : 
                     ( ( showParticipantPersonLink || showParticipantGroupMemberLink ) ?
-                        ( showParticipantPersonLink ? string.Format( "<a href=\"{0}{1}\" class=\"pull-right margin-l-sm btn btn-sm btn-default\"><i class=\"fa fa-user\"></i></a>", ParticipantPersonLink, groupMembers[d.EntityId.Value].PersonId ) : string.Empty ) +
-                        ( showParticipantGroupMemberLink ? string.Format( "<a href=\"{0}{1}\">{2}</a>", ParticipantGroupMemberLink, groupMembers[d.EntityId.Value].Id, groupMembers[d.EntityId.Value].Person.FullName ) : string.Empty )
+                        ( showParticipantPersonLink ? string.Format( "<a href=\"{0}\" class=\"pull-right margin-l-sm btn btn-sm btn-default\"><i class=\"fa fa-user\"></i></a>", ParticipantPersonLink.Replace( "{DonorPersonId}", d.Transaction.AuthorizedPersonAlias.Person.Id.ToString() ).Replace( "{GroupMemberId}", groupMembers[d.EntityId.Value].Id.ToString() ).Replace( "{GroupMemberPersonId}", groupMembers[d.EntityId.Value].PersonId.ToString() ) ) : string.Empty ) +
+                        ( showParticipantGroupMemberLink ? string.Format( "<a href=\"{0}\">{1}</a>", ParticipantGroupMemberLink.Replace( "{DonorPersonId}", d.Transaction.AuthorizedPersonAlias.Person.Id.ToString() ).Replace( "{GroupMemberId}", groupMembers[d.EntityId.Value].Id.ToString() ).Replace( "{GroupMemberPersonId}", groupMembers[d.EntityId.Value].PersonId.ToString() ), groupMembers[d.EntityId.Value].Person.FullName ) : string.Empty )
                         : groupMembers[d.EntityId.Value].Person.FullName )
                     ),
                     Amount = d.Amount,
