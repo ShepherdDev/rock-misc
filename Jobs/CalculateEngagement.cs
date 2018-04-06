@@ -209,10 +209,11 @@ namespace com.shepherdchurch.Misc.Jobs
                     //
                     // Work in batches so we don't overload the change tracker.
                     //
-                    var people = new PersonService( rockContext ).Queryable()
-                        .Where( p => personIds.Take( BATCH_SIZE ).Contains( p.Id ) )
-                        .ToList();
+                    var batchPersonIds = personIds.Take( BATCH_SIZE ).ToList();
                     personIds = personIds.Skip( BATCH_SIZE ).ToList();
+                    var people = new PersonService( rockContext ).Queryable()
+                        .Where( p => batchPersonIds.Contains( p.Id ) )
+                        .ToList();
 
                     foreach ( var person in people )
                     {
