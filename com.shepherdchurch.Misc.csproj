@@ -88,6 +88,7 @@
     <Compile Include="DataSelect\ScheduleSelect.cs" />
     <Compile Include="DataTransform\IncludeSpouseTransform.cs" />
     <Compile Include="Jobs\CalculateEngagement.cs" />
+    <Compile Include="Jobs\CleanupScheduledTransactions.cs" />
     <Compile Include="UI\Controls\MaskedAddressControl.cs" />
     <Compile Include="UI\Controls\MaskedEmailBox.cs" />
     <Compile Include="UI\Controls\MaskedPhoneNumberBox.cs" />
