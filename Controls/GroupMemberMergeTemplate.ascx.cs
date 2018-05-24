@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 using Rock;
@@ -209,6 +208,31 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     .SelectMany( g => g.Members )
                     .Where( m => m.GroupMemberStatus == GroupMemberStatus.Active )
                     .ToList();
+            }
+
+            switch ( rblSortBy.SelectedValue )
+            {
+                case "Group":
+                    records = records.OrderBy( m => m.Group.Name )
+                        .ThenBy( m => m.Person.FirstName )
+                        .ThenBy( m => m.Person.LastName )
+                        .ToList();
+                    break;
+
+                case "Last":
+                    records = records.OrderBy( m => m.Person.LastName )
+                        .ThenBy( m => m.Person.FirstName )
+                        .ThenBy( m => m.Group.Name )
+                        .ToList();
+                    break;
+
+                case "First":
+                default:
+                    records = records.OrderBy( m => m.Person.FirstName )
+                        .ThenBy( m => m.Person.LastName )
+                        .ThenBy( m => m.Group.Name )
+                        .ToList();
+                    break;
             }
 
             return records.Cast<object>().ToList();

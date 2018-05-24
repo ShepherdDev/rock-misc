@@ -28,12 +28,18 @@
                             <div class="col-md-6">
                                 <Rock:DataViewPicker ID="dvDataView" runat="server" Label="Data View" Required="true" />
                             </div>
-                            
+                    
                             <div class="col-md-6"></div>
                         </div>
                     </asp:Panel>
 
-                    <Rock:MergeTemplatePicker ID="mtPicker" runat="server" Label="Merge Template" OnSelectItem="mtPicker_SelectItem" />
+                    <Rock:RockRadioButtonList ID="rblSortBy" runat="server" Label="Sort By" RepeatDirection="Horizontal">
+                        <asp:ListItem Value="First" Text="First Name" Selected="True"></asp:ListItem>
+                        <asp:ListItem Value="Last" Text="Last Name"></asp:ListItem>
+                        <asp:ListItem Value="Group" Text="Group Name"></asp:ListItem>
+                    </Rock:RockRadioButtonList>
+
+                    <Rock:MergeTemplatePicker ID="mtPicker" runat="server" Label="Merge Template" Required="true" OnSelectItem="mtPicker_SelectItem" />
 
                     <Rock:NotificationBox ID="nbMergeError" runat="server" NotificationBoxType="Warning" CssClass="js-merge-error"/>
 
