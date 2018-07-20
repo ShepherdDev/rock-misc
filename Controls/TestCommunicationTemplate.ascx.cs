@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data.Entity;
 using System.Linq;
 using System.Web.UI.WebControls;
 
@@ -86,7 +87,6 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                 var emails = new CommunicationTemplateService( rockContext )
                     .Queryable()
-                    .Where( c => c.MediumEntityTypeId == entityTypeId )
                     .OrderBy( c => c.Name );
 
                 foreach ( var email in emails )
@@ -97,103 +97,75 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
         }
 
         /// <summary>
-        /// Gets the communication.
+        /// Updates a communication model with the user-entered values
         /// </summary>
-        /// <param name="rockContext">The rock context.</param>
-        /// <param name="peopleIds">The people ids.</param>
+        /// <param name="communicationService">The service.</param>
         /// <returns></returns>
-        private Communication GetCommunication( RockContext rockContext, List<int> peopleIds )
+        private Rock.Model.Communication UpdateCommunication( RockContext rockContext, Guid templateGuid )
         {
             var communicationService = new CommunicationService( rockContext );
-            var recipientService = new CommunicationRecipientService( rockContext );
+            var communicationAttachmentService = new CommunicationAttachmentService( rockContext );
+            var communicationRecipientService = new CommunicationRecipientService( rockContext );
+            var MediumEntityTypeId = EntityTypeCache.Read( "Rock.Communication.Medium.Email" ).Id;
 
-            var MediumData = GetTemplateData();
-            if ( MediumData != null )
+            Rock.Model.Communication communication = null;
+            IQueryable<CommunicationRecipient> qryRecipients = null;
+
+            CommunicationDetails CommunicationData = new CommunicationDetails();
+            var template = new CommunicationTemplateService( new RockContext() ).Get( templateGuid );
+            if ( template != null )
             {
-                Communication communication = new Communication();
+                CommunicationDetails.Copy( template, CommunicationData );
+                CommunicationData.EmailAttachmentBinaryFileIds = template.EmailAttachmentBinaryFileIds;
+            }
+
+            if ( communication == null )
+            {
+                communication = new Rock.Model.Communication();
                 communication.Status = CommunicationStatus.Transient;
                 communication.SenderPersonAliasId = CurrentPersonAliasId;
                 communicationService.Add( communication );
-                communication.IsBulkCommunication = true;
-                communication.MediumEntityTypeId = EntityTypeCache.Read( "Rock.Communication.Medium.Email" ).Id;
-                communication.FutureSendDateTime = null;
-
-                // add each person as a recipient to the communication
-                if ( peopleIds != null )
-                {
-                    foreach ( var personId in peopleIds )
-                    {
-                        if ( !communication.Recipients.Any( r => r.PersonAlias.PersonId == personId ) )
-                        {
-                            var communicationRecipient = new CommunicationRecipient();
-                            communicationRecipient.PersonAlias = new PersonAliasService( rockContext ).GetPrimaryAlias( personId );
-                            communication.Recipients.Add( communicationRecipient );
-                        }
-                    }
-                }
-
-                // add the MediumData to the communication
-                communication.MediumData.Clear();
-                foreach ( var keyVal in MediumData )
-                {
-                    if ( !string.IsNullOrEmpty( keyVal.Value ) )
-                    {
-                        communication.MediumData.Add( keyVal.Key, keyVal.Value );
-                    }
-                }
-
-                if ( communication.MediumData.ContainsKey( "Subject" ) )
-                {
-                    communication.Subject = communication.MediumData["Subject"];
-                    communication.MediumData.Remove( "Subject" );
-                }
-
-                return communication;
             }
 
-            return null;
-        }
-
-        /// <summary>
-        /// Gets the template data.
-        /// </summary>
-        /// <exception cref="System.Exception">Missing communication template configuration.</exception>
-        private Dictionary<string, string> GetTemplateData()
-        {
-            if ( string.IsNullOrWhiteSpace( ddlEmail.SelectedValue ) )
+            if ( qryRecipients == null )
             {
-                return null;
+                qryRecipients = communication.GetRecipientsQry( rockContext );
             }
 
-            var template = new CommunicationTemplateService( new RockContext() ).Get( ddlEmail.SelectedValue.AsGuid() );
-            if ( template == null )
+            communication.IsBulkCommunication = false;
+            var medium = MediumContainer.GetComponentByEntityTypeId( MediumEntityTypeId );
+            if ( medium != null )
             {
-                return null;
+                communication.CommunicationType = medium.CommunicationType;
             }
 
-            var mediumData = template.MediumData;
-            var MediumData = new Dictionary<string, string>();
-            if ( !mediumData.ContainsKey( "Subject" ) )
+            communication.CommunicationTemplateId = template.Id;
+
+            //GetMediumData();
+
+            foreach ( var recipient in communication.Recipients )
             {
-                mediumData.Add( "Subject", template.Subject );
+                recipient.MediumEntityTypeId = MediumEntityTypeId;
             }
 
-            foreach ( var dataItem in mediumData )
+            CommunicationDetails.Copy( CommunicationData, communication );
+
+            // delete any attachments that are no longer included
+            foreach ( var attachment in communication.Attachments.Where( a => !CommunicationData.EmailAttachmentBinaryFileIds.Contains( a.BinaryFileId ) ).ToList() )
             {
-                if ( !string.IsNullOrWhiteSpace( dataItem.Value ) )
-                {
-                    if ( MediumData.ContainsKey( dataItem.Key ) )
-                    {
-                        MediumData[dataItem.Key] = dataItem.Value;
-                    }
-                    else
-                    {
-                        MediumData.Add( dataItem.Key, dataItem.Value );
-                    }
-                }
+                communication.Attachments.Remove( attachment );
+                communicationAttachmentService.Delete( attachment );
             }
 
-            return MediumData;
+            // add any new attachments that were added
+            foreach ( var attachmentBinaryFileId in CommunicationData.EmailAttachmentBinaryFileIds.Where( a => !communication.Attachments.Any( x => x.BinaryFileId == a ) ) )
+            {
+                communication.AddAttachment( new CommunicationAttachment { BinaryFileId = attachmentBinaryFileId }, CommunicationType.Email );
+            }
+
+            communication.FutureSendDateTime = null;
+
+            return communication;
         }
 
         #endregion
@@ -225,48 +197,76 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             if ( GetAttributeValue( "CommunicationType" ) == "System" )
             {
-                Email.Send( ddlEmail.SelectedValueAsGuid().Value, recipients );
+                var message = new RockEmailMessage( ddlEmail.SelectedValueAsGuid().Value );
+                message.SetRecipients( recipients );
+                message.Send();
             }
             else
             {
-                var communication = GetCommunication( new RockContext(), null );
-
-                var testCommunication = new Communication();
-                testCommunication.SenderPersonAliasId = communication.SenderPersonAliasId;
-                testCommunication.Subject = communication.Subject;
-                testCommunication.IsBulkCommunication = communication.IsBulkCommunication;
-                testCommunication.MediumEntityTypeId = communication.MediumEntityTypeId;
-                testCommunication.MediumDataJson = communication.MediumDataJson;
-                testCommunication.AdditionalMergeFieldsJson = communication.AdditionalMergeFieldsJson;
-
-                testCommunication.FutureSendDateTime = null;
-                testCommunication.Status = CommunicationStatus.Approved;
-                testCommunication.ReviewedDateTime = RockDateTime.Now;
-                testCommunication.ReviewerPersonAliasId = CurrentPersonAliasId.Value;
-
-                var testRecipient = new CommunicationRecipient();
-                if ( communication.Recipients.Any() )
+                // Get existing or new communication record
+                var communication = UpdateCommunication( new RockContext(), ddlEmail.SelectedValueAsGuid().Value );
+                if ( communication != null )
                 {
-                    var recipient = communication.Recipients.FirstOrDefault();
-                    testRecipient.AdditionalMergeValuesJson = recipient.AdditionalMergeValuesJson;
+                    using ( var rockContext = new RockContext() )
+                    {
+                        // Using a new context (so that changes in the UpdateCommunication() are not persisted )
+                        var testCommunication = communication.Clone( false );
+                        testCommunication.Id = 0;
+                        testCommunication.Guid = Guid.NewGuid();
+                        testCommunication.CreatedByPersonAliasId = this.CurrentPersonAliasId;
+                        testCommunication.CreatedByPersonAlias = new PersonAliasService( rockContext ).Queryable().Where( a => a.Id == this.CurrentPersonAliasId.Value ).Include( a => a.Person ).FirstOrDefault();
+
+                        testCommunication.ForeignGuid = null;
+                        testCommunication.ForeignId = null;
+                        testCommunication.ForeignKey = null;
+
+                        testCommunication.FutureSendDateTime = null;
+                        testCommunication.Status = CommunicationStatus.Approved;
+                        testCommunication.ReviewedDateTime = RockDateTime.Now;
+                        testCommunication.ReviewerPersonAliasId = CurrentPersonAliasId;
+
+                        foreach ( var attachment in communication.Attachments )
+                        {
+                            var cloneAttachment = attachment.Clone( false );
+                            cloneAttachment.Id = 0;
+                            cloneAttachment.Guid = Guid.NewGuid();
+                            cloneAttachment.ForeignGuid = null;
+                            cloneAttachment.ForeignId = null;
+                            cloneAttachment.ForeignKey = null;
+
+                            testCommunication.Attachments.Add( cloneAttachment );
+                        }
+
+                        var testRecipient = new CommunicationRecipient();
+                        if ( communication.GetRecipientCount( rockContext ) > 0 )
+                        {
+                            var recipient = communication.GetRecipientsQry( rockContext ).FirstOrDefault();
+                            testRecipient.AdditionalMergeValuesJson = recipient.AdditionalMergeValuesJson;
+                        }
+
+                        testRecipient.Status = CommunicationRecipientStatus.Pending;
+                        testRecipient.PersonAliasId = CurrentPersonAliasId.Value;
+                        testRecipient.MediumEntityTypeId = EntityTypeCache.Read( "Rock.Communication.Medium.Email" ).Id;
+                        testCommunication.Recipients.Add( testRecipient );
+
+                        var communicationService = new CommunicationService( rockContext );
+                        communicationService.Add( testCommunication );
+                        rockContext.SaveChanges();
+
+                        foreach ( var medium in testCommunication.GetMediums() )
+                        {
+                            medium.Send( testCommunication );
+                        }
+
+                        testRecipient = new CommunicationRecipientService( rockContext )
+                            .Queryable().AsNoTracking()
+                            .Where( r => r.CommunicationId == testCommunication.Id )
+                            .FirstOrDefault();
+
+                        communicationService.Delete( testCommunication );
+                        rockContext.SaveChanges();
+                    }
                 }
-                testRecipient.Status = CommunicationRecipientStatus.Pending;
-                testRecipient.PersonAliasId = CurrentPersonAliasId.Value;
-                testCommunication.Recipients.Add( testRecipient );
-
-                var rockContext = new RockContext();
-                var communicationService = new CommunicationService( rockContext );
-                communicationService.Add( testCommunication );
-                rockContext.SaveChanges();
-
-                var medium = testCommunication.Medium;
-                if ( medium != null )
-                {
-                    medium.Send( testCommunication );
-                }
-
-                communicationService.Delete( testCommunication );
-                rockContext.SaveChanges();
             }
 
             nbSuccess.Text = string.Format( "Sent test at {0}", DateTime.Now );
