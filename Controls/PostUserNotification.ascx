@@ -43,7 +43,7 @@
                     <asp:Panel ID="pnlDataView" runat="server" Visible="false">
                         <div class="row">
                             <div class="col-md-6">
-                                <Rock:DataViewPicker ID="dvDataView" runat="server" Label="Data View" OnSelectedIndexChanged="dvDataView_SelectedIndexChanged" AutoPostBack="true" CausesValidation="false" />
+                                <Rock:DataViewItemPicker ID="dvDataView" runat="server" Label="Data View" OnSelectedIndexChanged="dvDataView_SelectedIndexChanged" AutoPostBack="true" CausesValidation="false" />
                             </div>
                             
                             <div class="col-md-6"></div>

@@ -71,7 +71,7 @@ namespace Plugins.com_shepherdchurch.Misc
 
                 foreach ( var guid in guids )
                 {
-                    var checkInDeviceTypeId = DefinedValueCache.Read( guid ).Id;
+                    var checkInDeviceTypeId = DefinedValueCache.Get( guid ).Id;
                     var device = deviceService.GetByIPAddress( RockPage.GetClientIpAddress(), checkInDeviceTypeId, !enableReverseLookup );
 
                     if ( device != null )

@@ -50,8 +50,8 @@ namespace com.shepherdchurch.Misc.Follow
                 return false;
             }
 
-            var currentlyAnEraAttribute = AttributeCache.Read( GetAttributeValue( followingEvent, "CurrentlyaneRAAttribute" ).AsGuid() );
-            var eraEndDateAttribute = AttributeCache.Read( GetAttributeValue( followingEvent, "eRAEndDateAttribute" ).AsGuid() );
+            var currentlyAnEraAttribute = AttributeCache.Get( GetAttributeValue( followingEvent, "CurrentlyaneRAAttribute" ).AsGuid() );
+            var eraEndDateAttribute = AttributeCache.Get( GetAttributeValue( followingEvent, "eRAEndDateAttribute" ).AsGuid() );
 
             if ( followingEvent != null && entity != null && currentlyAnEraAttribute != null && eraEndDateAttribute != null )
             {

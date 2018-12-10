@@ -217,8 +217,8 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     transaction.AuthorizedPersonAliasId = new PersonService( rockContext ).Get( SelectedPersonGuid ).PrimaryAliasId;
                     transaction.TransactionDateTime = RockDateTime.Now;
                     transaction.FinancialGatewayId = financialGateway.Id;
-                    transaction.TransactionTypeValueId = DefinedValueCache.Read( GetAttributeValue( "TransactionType" ) ).Id;
-                    transaction.SourceTypeValueId = DefinedValueCache.Read( GetAttributeValue( "Source" ) ).Id;
+                    transaction.TransactionTypeValueId = DefinedValueCache.Get( GetAttributeValue( "TransactionType" ) ).Id;
+                    transaction.SourceTypeValueId = DefinedValueCache.Get( GetAttributeValue( "Source" ) ).Id;
                     transaction.Summary = swipeInfo.Comment1;
 
                     //
@@ -245,11 +245,11 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         transaction.TransactionDateTime.Value,
                         financialGateway.GetBatchTimeOffset() );
 
-                    var batchChanges = new List<string>();
+                    var batchChanges = new History.HistoryChangeList();
 
                     if ( batch.Id == 0 )
                     {
-                        batchChanges.Add( "Generated the batch" );
+                        batchChanges.AddChange( History.HistoryVerb.Add, History.HistoryChangeType.Record, "Batch" );
                         History.EvaluateChange( batchChanges, "Batch Name", string.Empty, batch.Name );
                         History.EvaluateChange( batchChanges, "Status", null, batch.Status );
                         History.EvaluateChange( batchChanges, "Start Date/Time", null, batch.BatchStartDateTime );
@@ -462,7 +462,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 return false;
             }
 
-            if ( DefinedValueCache.Read( GetAttributeValue( "Source" ) ) == null )
+            if ( DefinedValueCache.Get( GetAttributeValue( "Source" ) ) == null )
             {
                 nbBlockConfigErrors.Heading = "No Source";
                 nbBlockConfigErrors.Text = "<p>There is currently no transaction source configured.</p>";
@@ -470,7 +470,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 return false;
             }
 
-            if ( DefinedValueCache.Read( GetAttributeValue( "TransactionType" ) ) == null )
+            if ( DefinedValueCache.Get( GetAttributeValue( "TransactionType" ) ) == null )
             {
                 nbBlockConfigErrors.Heading = "No Transaction Type";
                 nbBlockConfigErrors.Text = "<p>There is currently no transaction type configured.</p>";

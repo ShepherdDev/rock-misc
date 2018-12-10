@@ -462,7 +462,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             var sourcePageGuid = GetAttributeValue( "SourcePage" ).AsGuidOrNull();
             if ( sourcePageGuid.HasValue )
             {
-                var sourcePage = PageCache.Read( sourcePageGuid.Value );
+                var sourcePage = PageCache.Get( sourcePageGuid.Value );
 
                 if ( sourcePage != null )
                 {
@@ -645,7 +645,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             if ( sourcePageGuid != RockPage.Guid )
             {
-                var sourcePage = PageCache.Read( sourcePageGuid );
+                var sourcePage = PageCache.Get( sourcePageGuid );
 
                 if ( sourcePage != null )
                 {
@@ -712,7 +712,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 }
                 else
                 {
-                    blockType.BlockCache = BlockCache.Read( blockType.BlockId );
+                    blockType.BlockCache = BlockCache.Get( blockType.BlockId );
                 }
             }
 
@@ -843,7 +843,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
             foreach ( var blockType in blockTypes )
             {
-                blockType.BlockCache = BlockCache.Read( blockType.BlockId );
+                blockType.BlockCache = BlockCache.Get( blockType.BlockId );
             }
 
             foreach ( GridViewRow row in gSettingsBlocks.Rows.OfType<GridViewRow>() )
@@ -1059,7 +1059,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 }
                 else
                 {
-                    blockType.BlockCache = BlockCache.Read( blockType.BlockId );
+                    blockType.BlockCache = BlockCache.Get( blockType.BlockId );
                 }
             }
 
@@ -1099,7 +1099,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             ReadSettingsLayoutSelection();
             var blockTypes = AvailableBlocksLive;
 
-            var page = PageCache.Read( ppSettingsSourcePage.SelectedValueAsId().Value );
+            var page = PageCache.Get( ppSettingsSourcePage.SelectedValueAsId().Value );
             SetAttributeValue( "SourcePage", page.Guid.ToString() );
             SetAttributeValue( "Title", tbSettingsTitle.Text );
             SetAttributeValue( "IconCSSClass", tbSettingsIconCSSClass.Text );

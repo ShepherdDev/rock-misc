@@ -80,9 +80,9 @@ namespace com.shepherdchurch.Misc.DataTransform
         {
             var rockContext = ( RockContext ) serviceInstance.Context;
             var adultGuid = Rock.SystemGuid.GroupRole.GROUPROLE_FAMILY_MEMBER_ADULT.AsGuid();
-            var adultGroupRoleId = GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY ).Roles.FirstOrDefault( r => r.Guid == adultGuid ).Id;
-            var marriedStatusId = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_MARITAL_STATUS_MARRIED ).Id;
-            var familyGroupTypeId = GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY ).Id;
+            var adultGroupRoleId = GroupTypeCache.Get( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY ).Roles.FirstOrDefault( r => r.Guid == adultGuid ).Id;
+            var marriedStatusId = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.PERSON_MARITAL_STATUS_MARRIED ).Id;
+            var familyGroupTypeId = GroupTypeCache.Get( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY ).Id;
 
             //
             // This duplicates the functionality of the ufnCrm_GetSpousePersonIdFromPersonId function
@@ -105,8 +105,8 @@ namespace com.shepherdchurch.Misc.DataTransform
                         ( x.p1.Gender != x.p2.Gender || x.p1.Gender == Gender.Unknown || x.p2.Gender == Gender.Unknown ) )
                 .Select( x => new
                 {
-                    p1 = x.p1,
-                    p2 = x.p2,
+                    x.p1,
+                    x.p2,
                     dif = Math.Abs( DbFunctions.DiffDays( x.p1.BirthDate ?? new DateTime( 1, 1, 1 ), x.p2.BirthDate ?? new DateTime( 1, 1, 1 ) ).Value )
                 } )
                 .GroupBy( x => x.p1 )

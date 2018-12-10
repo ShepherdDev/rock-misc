@@ -65,8 +65,8 @@ namespace Plugins.com_shepherdchurch.Misc
         /// </summary>
         protected void ShowDetails()
         {
-            var homePhoneType = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid() );
-            var mobilePhoneType = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid() );
+            var homePhoneType = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid() );
+            var mobilePhoneType = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid() );
 
             pnHome.Label = homePhoneType.Value;
             pnMobile.Label = mobilePhoneType.Value;
@@ -99,8 +99,7 @@ namespace Plugins.com_shepherdchurch.Misc
         /// <param name="person">The Person whose phone number is to be changed.</param>
         /// <param name="phoneType">The phone number type of the phone number.</param>
         /// <param name="pnBox">The value of the phone number.</param>
-        /// <param name="changes">The list of changes to later be recorded to history.</param>
-        protected void SetPhone( Person person, DefinedValueCache phoneType, Rock.Web.UI.Controls.PhoneNumberBox pnBox, List<string> changes )
+        protected void SetPhone( Person person, DefinedValueCache phoneType, Rock.Web.UI.Controls.PhoneNumberBox pnBox )
         {
             var phoneNumber = person.PhoneNumbers.FirstOrDefault( n => n.NumberTypeValueId == phoneType.Id );
             string oldPhone = string.Empty;
@@ -117,8 +116,6 @@ namespace Plugins.com_shepherdchurch.Misc
 
             phoneNumber.CountryCode = PhoneNumber.CleanNumber( pnBox.CountryCode );
             phoneNumber.Number = PhoneNumber.CleanNumber( pnBox.Number );
-
-            History.EvaluateChange( changes, string.Format( "{0} Phone", phoneType.Value ), oldPhone, phoneNumber.NumberFormattedWithCountryCode );
         }
 
         /// <summary>
@@ -202,28 +199,25 @@ namespace Plugins.com_shepherdchurch.Misc
         private Person GetPerson( RockContext rockContext )
         {
             var personService = new PersonService( rockContext );
-            var homeAddressType = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_HOME );
-            var homePhoneType = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid() );
-            var mobilePhoneType = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid() );
-            var changes = new List<string>();
-            var familyChanges = new List<string>();
+            var homeAddressType = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_HOME );
+            var homePhoneType = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid() );
+            var mobilePhoneType = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid() );
             Person person = null;
             Group family = null;
             GroupLocation homeLocation = null;
-            bool isNew = false;
 
             //
             // Look for existing person.
             //
-            person = personService.GetByMatch( tbFirstName.Text, tbLastName.Text, tbEmail.Text ).FirstOrDefault();
+            person = personService.FindPersons( tbFirstName.Text, tbLastName.Text, tbEmail.Text ).FirstOrDefault();
 
             if ( person == null )
             {
                 //
                 // Create new person.
                 //
-                DefinedValueCache dvcConnectionStatus = DefinedValueCache.Read( GetAttributeValue( "ConnectionStatus" ).AsGuid() );
-                DefinedValueCache dvcRecordStatus = DefinedValueCache.Read( GetAttributeValue( "RecordStatus" ).AsGuid() );
+                DefinedValueCache dvcConnectionStatus = DefinedValueCache.Get( GetAttributeValue( "ConnectionStatus" ).AsGuid() );
+                DefinedValueCache dvcRecordStatus = DefinedValueCache.Get( GetAttributeValue( "RecordStatus" ).AsGuid() );
 
                 person = new Person();
                 person.FirstName = tbFirstName.Text;
@@ -231,7 +225,7 @@ namespace Plugins.com_shepherdchurch.Misc
                 person.Email = tbEmail.Text;
                 person.IsEmailActive = true;
                 person.EmailPreference = EmailPreference.EmailAllowed;
-                person.RecordTypeValueId = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_RECORD_TYPE_PERSON.AsGuid() ).Id;
+                person.RecordTypeValueId = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.PERSON_RECORD_TYPE_PERSON.AsGuid() ).Id;
                 if ( dvcConnectionStatus != null )
                 {
                     person.ConnectionStatusValueId = dvcConnectionStatus.Id;
@@ -243,7 +237,6 @@ namespace Plugins.com_shepherdchurch.Misc
                 }
 
                 family = PersonService.SaveNewPerson( person, rockContext, null, false );
-                isNew = true;
             }
             else
             {
@@ -278,7 +271,7 @@ namespace Plugins.com_shepherdchurch.Misc
             //
             if ( colHomePhone.Visible && !string.IsNullOrWhiteSpace( pnHome.Number ) )
             {
-                SetPhone( person, homePhoneType, pnHome, changes );
+                SetPhone( person, homePhoneType, pnHome );
             }
 
             //
@@ -286,7 +279,7 @@ namespace Plugins.com_shepherdchurch.Misc
             //
             if ( colMobilePhone.Visible && !string.IsNullOrWhiteSpace( pnMobile.Number ) )
             {
-                SetPhone( person, mobilePhoneType, pnMobile, changes );
+                SetPhone( person, mobilePhoneType, pnMobile );
             }
 
             //
@@ -307,7 +300,6 @@ namespace Plugins.com_shepherdchurch.Misc
                     }
 
                     homeLocation.Location = location;
-                    History.EvaluateChange( familyChanges, "Home Location", oldLocation, newLocation );
                 }
             }
 
@@ -315,13 +307,6 @@ namespace Plugins.com_shepherdchurch.Misc
             // Save all changes.
             //
             rockContext.SaveChanges();
-            if ( !isNew )
-            {
-                HistoryService.SaveChanges( rockContext, typeof( Person ),
-                    Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(), person.Id, changes );
-                HistoryService.SaveChanges( rockContext, typeof( Person ),
-                    Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(), person.Id, familyChanges );
-            }
 
             return person;
         }

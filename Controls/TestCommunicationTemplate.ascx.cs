@@ -1,17 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data.Entity;
-using System.Linq;
-using System.Web.UI.WebControls;
-
-using Rock;
+﻿using Rock;
 using Rock.Attribute;
 using Rock.Communication;
 using Rock.Data;
 using Rock.Model;
 using Rock.Web.Cache;
 using Rock.Web.UI;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data.Entity;
+using System.Linq;
+using System.Web.UI.WebControls;
 
 namespace RockWeb.Plugins.com_shepherdchurch.Misc
 {
@@ -83,7 +82,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 ltTitle.Text = "Test Communication Template";
                 ddlEmail.Label = "Communication Template";
 
-                var entityTypeId = EntityTypeCache.Read( "Rock.Communication.Medium.Email" ).Id;
+                var entityTypeId = EntityTypeCache.Get( "Rock.Communication.Medium.Email" ).Id;
 
                 var emails = new CommunicationTemplateService( rockContext )
                     .Queryable()
@@ -106,7 +105,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
             var communicationService = new CommunicationService( rockContext );
             var communicationAttachmentService = new CommunicationAttachmentService( rockContext );
             var communicationRecipientService = new CommunicationRecipientService( rockContext );
-            var MediumEntityTypeId = EntityTypeCache.Read( "Rock.Communication.Medium.Email" ).Id;
+            var MediumEntityTypeId = EntityTypeCache.Get( "Rock.Communication.Medium.Email" ).Id;
 
             Rock.Model.Communication communication = null;
             IQueryable<CommunicationRecipient> qryRecipients = null;
@@ -238,7 +237,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                         }
 
                         var testRecipient = new CommunicationRecipient();
-                        if ( communication.GetRecipientCount( rockContext ) > 0 )
+                        if ( communication.Recipients.Count > 0 )
                         {
                             var recipient = communication.GetRecipientsQry( rockContext ).FirstOrDefault();
                             testRecipient.AdditionalMergeValuesJson = recipient.AdditionalMergeValuesJson;
@@ -246,7 +245,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
                         testRecipient.Status = CommunicationRecipientStatus.Pending;
                         testRecipient.PersonAliasId = CurrentPersonAliasId.Value;
-                        testRecipient.MediumEntityTypeId = EntityTypeCache.Read( "Rock.Communication.Medium.Email" ).Id;
+                        testRecipient.MediumEntityTypeId = EntityTypeCache.Get( "Rock.Communication.Medium.Email" ).Id;
                         testCommunication.Recipients.Add( testRecipient );
 
                         var communicationService = new CommunicationService( rockContext );

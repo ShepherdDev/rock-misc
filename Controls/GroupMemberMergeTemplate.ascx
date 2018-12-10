@@ -26,7 +26,7 @@
                     <asp:Panel ID="pnlDataView" runat="server" Visible="false">
                         <div class="row">
                             <div class="col-md-6">
-                                <Rock:DataViewPicker ID="dvDataView" runat="server" Label="Data View" Required="true" />
+                                <Rock:DataViewItemPicker ID="dvDataView" runat="server" Label="Data View" Required="true" />
                             </div>
                     
                             <div class="col-md-6"></div>

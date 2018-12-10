@@ -83,7 +83,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
 
         private void SetFilter()
         {
-            cblCurrencyType.BindToDefinedType( DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.FINANCIAL_CURRENCY_TYPE.AsGuid() ) );
+            cblCurrencyType.BindToDefinedType( DefinedTypeCache.Get( Rock.SystemGuid.DefinedType.FINANCIAL_CURRENCY_TYPE.AsGuid() ) );
 
             cblCurrencyType.SetValues( fPayments.GetUserPreference( "Currency Type" ).SplitDelimitedValues().AsIntegerList() );
 
@@ -101,7 +101,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 using ( var rockContext = new RockContext() )
                 {
                     // If configured for a registration and registration is null, return
-                    int registrationEntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.Registration ) ).Id;
+                    int registrationEntityTypeId = EntityTypeCache.Get( typeof( Rock.Model.Registration ) ).Id;
 
                     // Get all the registrations for this instance
                     PaymentRegistrations = new RegistrationService( rockContext )
@@ -278,7 +278,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                 case "Currency Type":
                     {
                         var ids = e.Value.SplitDelimitedValues().AsIntegerList();
-                        e.Value = DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.FINANCIAL_CURRENCY_TYPE.AsGuid() )
+                        e.Value = DefinedTypeCache.Get( Rock.SystemGuid.DefinedType.FINANCIAL_CURRENCY_TYPE.AsGuid() )
                             .DefinedValues
                             .Where( dv => ids.Contains( dv.Id ) )
                             .Select( dv => dv.Value )

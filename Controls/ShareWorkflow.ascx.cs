@@ -1820,7 +1820,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc.Export
 
             foreach ( var entityType in entityTypeStrings )
             {
-                if ( EntityTypeCache.Read( entityType, false, null ) == null )
+                if ( EntityTypeCache.Get( entityType, false, null ) == null )
                 {
                     missingTypes.Add( entityType );
                 }

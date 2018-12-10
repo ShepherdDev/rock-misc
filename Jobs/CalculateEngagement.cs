@@ -46,9 +46,9 @@ namespace com.shepherdchurch.Misc.Jobs
             //
             // Find the specified attributes in the cache.
             //
-            var engagedAttribute = engagedAttributeGuid.HasValue ? AttributeCache.Read( engagedAttributeGuid.Value ) : null;
-            var startDateAttribute = startDateAttributeGuid.HasValue ? AttributeCache.Read( startDateAttributeGuid.Value ) : null;
-            var endDateAttribute = endDateAttributeGuid.HasValue ? AttributeCache.Read( endDateAttributeGuid.Value ) : null;
+            var engagedAttribute = engagedAttributeGuid.HasValue ? AttributeCache.Get( engagedAttributeGuid.Value ) : null;
+            var startDateAttribute = startDateAttributeGuid.HasValue ? AttributeCache.Get( startDateAttributeGuid.Value ) : null;
+            var endDateAttribute = endDateAttributeGuid.HasValue ? AttributeCache.Get( endDateAttributeGuid.Value ) : null;
 
             using ( var rockContext = new RockContext() )
             {
@@ -217,8 +217,6 @@ namespace com.shepherdchurch.Misc.Jobs
 
                     foreach ( var person in people )
                     {
-                        var changes = new List<string>();
-
                         //
                         // Update person attributes.
                         //
@@ -231,7 +229,7 @@ namespace com.shepherdchurch.Misc.Jobs
                             //
                             if ( engagedAttribute != null )
                             {
-                                SetPersonAttribute( rockContext, person, engagedAttribute, engaged.ToString(), changes );
+                                SetPersonAttribute( rockContext, person, engagedAttribute, engaged.ToString() );
                             }
 
                             //
@@ -241,7 +239,7 @@ namespace com.shepherdchurch.Misc.Jobs
                             //
                             if ( startDateAttribute != null && engaged )
                             {
-                                SetPersonAttribute( rockContext, person, startDateAttribute, RockDateTime.Now.ToShortDateString(), changes );
+                                SetPersonAttribute( rockContext, person, startDateAttribute, RockDateTime.Now.ToShortDateString() );
                             }
 
                             //
@@ -250,20 +248,8 @@ namespace com.shepherdchurch.Misc.Jobs
                             //
                             if ( endDateAttribute != null )
                             {
-                                SetPersonAttribute( rockContext, person, endDateAttribute, !engaged ? RockDateTime.Now.ToShortDateString() : string.Empty, changes );
+                                SetPersonAttribute( rockContext, person, endDateAttribute, !engaged ? RockDateTime.Now.ToShortDateString() : string.Empty );
                             }
-                        }
-
-                        //
-                        // Create history records.
-                        //
-                        if ( changes.Any() )
-                        {
-                            HistoryService.AddChanges( rockContext,
-                                typeof( Person ),
-                                Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(),
-                                person.Id,
-                                changes );
                         }
                     }
 
@@ -290,8 +276,7 @@ namespace com.shepherdchurch.Misc.Jobs
         /// <param name="person">The person to be updated.</param>
         /// <param name="attribute">The attribute whose value is to be updated.</param>
         /// <param name="value">The new value to be saved.</param>
-        /// <param name="changes">The list of changes to be added to.</param>
-        protected void SetPersonAttribute( RockContext rockContext, Person person, AttributeCache attribute, string value, List<string> changes )
+        protected void SetPersonAttribute( RockContext rockContext, Person person, AttributeCache attribute, string value )
         {
             string originalValue = person.GetAttributeValue( attribute.Key );
 
@@ -310,8 +295,6 @@ namespace com.shepherdchurch.Misc.Jobs
                 {
                     formattedNewValue = attribute.FieldType.Field.FormatValue( null, value, attribute.QualifierValues, false );
                 }
-
-                History.EvaluateChange( changes, attribute.Name, formattedOriginalValue, formattedNewValue );
             }
         }
     }

@@ -120,7 +120,7 @@ namespace RockWeb.Plugins.com_shepherdchurch.Misc
                     }
                     else
                     {
-                        var pageCache = PageCache.Read( RockPage.PageId );
+                        var pageCache = PageCache.Get( RockPage.PageId );
                         if ( pageCache != null && pageCache.ParentPage != null )
                         {
                             target = new PageReference( pageCache.ParentPage.Guid.ToString() );
