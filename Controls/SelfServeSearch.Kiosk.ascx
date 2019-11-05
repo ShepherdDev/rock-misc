@@ -55,40 +55,38 @@
         <script>
             var isTouchDevice = 'ontouchstart' in document.documentElement;
             Sys.Application.add_load(function () {
-                //
-                // search 
-                //
-                if ($(".js-pnlsearch").is(":visible"))
-                {
-                    // setup digits buttons
-                    $('.js-pnlsearch .tenkey a.digit').click(function ()
-                    {
-                        $phoneNumber = $("input[id$='tbPhone']");
-                        $phoneNumber.val($phoneNumber.val() + $(this).html());
-                        return false;
-                    });
-                    $('.js-pnlsearch .tenkey a.back').click(function ()
-                    {
-                        $phoneNumber = $("input[id$='tbPhone']");
-                        $phoneNumber.val($phoneNumber.val().slice(0, -1));
-                        return false;
-                    });
-                    $('.js-pnlsearch .tenkey a.clear').click(function ()
-                    {
-                        $phoneNumber = $("input[id$='tbPhone']");
-                        $phoneNumber.val('');
-                        return false;
-                    });
-                    // set focus to the input unless on a touch device
-                    if (!isTouchDevice)
-                    {
-                        $('.kiosk-phoneentry').focus();
+                setTimeout(function () {
+                    resizeBody();
+
+                    //
+                    // search 
+                    //
+                    if ($(".js-pnlsearch").is(":visible")) {
+                        // setup digits buttons
+                        $('.js-pnlsearch .tenkey a.digit').click(function () {
+                            $phoneNumber = $("input[id$='tbPhone']");
+                            $phoneNumber.val($phoneNumber.val() + $(this).html());
+                            return false;
+                        });
+                        $('.js-pnlsearch .tenkey a.back').click(function () {
+                            $phoneNumber = $("input[id$='tbPhone']");
+                            $phoneNumber.val($phoneNumber.val().slice(0, -1));
+                            return false;
+                        });
+                        $('.js-pnlsearch .tenkey a.clear').click(function () {
+                            $phoneNumber = $("input[id$='tbPhone']");
+                            $phoneNumber.val('');
+                            return false;
+                        });
+                        // set focus to the input unless on a touch device
+                        if (!isTouchDevice) {
+                            $('.kiosk-phoneentry').focus();
+                        }
+                        if ($('.kiosk-nameentry').length) {
+                            $('.kiosk-nameentry').focus();
+                        }
                     }
-                    if ($('.kiosk-nameentry').length)
-                    {
-                        $('.kiosk-nameentry').focus();
-                    }
-                }
+                }, 10);
             });
         </script>
 
