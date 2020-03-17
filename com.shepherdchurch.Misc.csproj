@@ -87,6 +87,7 @@
     <Compile Include="DataFilter\AvailableCapacityFilter.cs" />
     <Compile Include="DataSelect\GroupLavaPropertySelect.cs" />
     <Compile Include="DataSelect\LavaPropertySelect.cs" />
+    <Compile Include="DataFilter\GroupInLocationGeofenceFilter.cs" />
     <Compile Include="DataSelect\PersonLavaPropertySelect.cs" />
     <Compile Include="DataSelect\ScheduleSelect.cs" />
     <Compile Include="DataTransform\IncludeSpouseTransform.cs" />
