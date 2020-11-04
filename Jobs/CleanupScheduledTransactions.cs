@@ -12,19 +12,20 @@ using Rock.Model;
 
 namespace com.shepherdchurch.Misc.Jobs
 {
+    [IntegerField( "Age In Days", "The number of days old a scheduled transaction must be to be considered for cleanup.", true, 7 )]
     [DisallowConcurrentExecution]
     public class CleanupScheduledTransactions : IJob
     {
-        const int BATCH_SIZE = 100;
-
         public virtual void Execute( IJobExecutionContext context )
         {
+            JobDataMap dataMap = context.JobDetail.JobDataMap;
             List<string> messages = new List<string>();
+            var daysBack = dataMap.GetString( "AgeInDays" ).AsIntegerOrNull() ?? 7;
 
             using ( var rockContext = new RockContext() )
             {
                 var txnService = new FinancialScheduledTransactionService( rockContext );
-                var checkDate = DateTime.Now.AddDays( -7 );
+                var checkDate = DateTime.Now.AddDays( -daysBack );
                 var txns = txnService
                     .Queryable( "AuthorizedPersonAlias.Person,FinancialGateway" )
                     .Where( t => t.IsActive )
